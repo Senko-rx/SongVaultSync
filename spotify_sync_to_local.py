@@ -1,5 +1,4 @@
-import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import HTTPServer
 import requests
 import base64
 import urllib.parse
@@ -7,6 +6,7 @@ import json
 import os
 from dotenv import load_dotenv
 import webbrowser
+from handler import Handler
 
 load_dotenv()
 
@@ -15,91 +15,82 @@ CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI")
 SCOPE = "user-library-read"
 
-auth_code = None
+class SpotifySyncToLocal:
 
-# We run local server so that we can automate the fetching of the code from the callback response
-class Handler(BaseHTTPRequestHandler):
-    def do_get(self):
-        global auth_code
-        query = urllib.parse.urlparse(self.path).query
-        params = urllib.parse.parse_qs(query)
+    def _get_access_token(self):
+        server = HTTPServer(("127.0.0.1", 8888), Handler)
+        server.auth_code = None
+        auth_url = "https://accounts.spotify.com/authorize"
+        params = {
+            "client_id": CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": REDIRECT_URI,
+            "scope": SCOPE
+        }
 
-        if "code" in params:
-            auth_code = params["code"][0]
+        url = auth_url + "?" + urllib.parse.urlencode(params)
 
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(b"You can close this window.")
-            print("Code received!")
+        webbrowser.open(url)
 
+        # Wait for redirect
+        while server.auth_code is None:
+            server.handle_request()
 
-server = HTTPServer(("127.0.0.1", 8888), Handler)
+        token_url = "https://accounts.spotify.com/api/token"
 
-auth_url = "https://accounts.spotify.com/authorize"
-params = {
-    "client_id": CLIENT_ID,
-    "response_type": "code",
-    "redirect_uri": REDIRECT_URI,
-    "scope": SCOPE
-}
+        auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-url = auth_url + "?" + urllib.parse.urlencode(params)
+        headers = {
+            "Authorization": f"Basic {auth_header}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
 
-webbrowser.open(url)
+        data = {
+            "grant_type": "authorization_code",
+            "code": server.auth_code,
+            "redirect_uri": REDIRECT_URI
+        }
 
-# Wait for redirect
-while auth_code is None:
-    server.handle_request()
+        response = requests.post(token_url, headers=headers, data=data)
+        token_info = response.json()
 
-token_url = "https://accounts.spotify.com/api/token"
+        access_token = token_info["access_token"]
 
-auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+        print("Access token received! Requesting songs from Spotify")
 
-headers = {
-    "Authorization": f"Basic {auth_header}",
-    "Content-Type": "application/x-www-form-urlencoded"
-}
+        return access_token
 
-data = {
-    "grant_type": "authorization_code",
-    "code": auth_code,
-    "redirect_uri": REDIRECT_URI
-}
+    def _fetch_song_list(self, access_token):
+        # Fetch liked songs (paginated)
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
 
-response = requests.post(token_url, headers=headers, data=data)
-token_info = response.json()
+        url = "https://api.spotify.com/v1/me/tracks?limit=50"
 
-access_token = token_info["access_token"]
+        songs = []
 
-print("Access token received! Requesting songs from Spotify")
+        while url:
+            res = requests.get(url, headers=headers).json()
 
-# Fetch liked songs (paginated)
-headers = {
-    "Authorization": f"Bearer {access_token}"
-}
+            for item in res["items"]:
+                track = item["track"]
+                songs.append({
+                    "name": track["name"],
+                    "artists": [artist["name"] for artist in track["artists"]],
+                })
 
-url = "https://api.spotify.com/v1/me/tracks?limit=50"
+            url = res["next"]
 
-songs = []
+        for s in songs:
+            artist_string = ", ".join(s["artists"])
+            print(f"{artist_string} - {s['name']}")
 
-while url:
-    res = requests.get(url, headers=headers).json()
+        with open('list_data.json', 'w') as f:
+            json.dump(songs, f)
 
-    for item in res["items"]:
-        track = item["track"]
-        songs.append({
-            "name": track["name"],
-            "artists": [artist["name"] for artist in track["artists"]],
-        })
+        print("\nTotal:", len(songs))
 
-    url = res["next"]
-
-for s in songs:
-    artist_string = ", ".join(s["artists"])
-    print(f"{artist_string} - {s['name']}")
-
-with open('list_data.json', 'w') as f:
-    json.dump(songs, f)
-
-print("\nTotal:", len(songs))
+    def sync(self):
+        access_token = self._get_access_token()
+        self._fetch_song_list(access_token)
