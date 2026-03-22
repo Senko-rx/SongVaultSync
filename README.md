@@ -28,6 +28,7 @@ This program is meant to be used as a baseline and example for learning and impl
 - Python 3 (3.14 was used during development)
 - A Spotify Developer account
 - Spotify application credentials
+- FFMPEG
 
 ### Installation
 
@@ -76,5 +77,8 @@ The app still needs to implement a proper rate limiter to respect Spotify's API 
 - Progress tracking for long-running transfers
 
 ## Future work
-Coaming soon!
+- The implementation of adding multiple playlists to the transfer queue
+- The implementation of a progress bar for long-running transfers
+- The ability to easily change the places you download your music from
+- Eventually a guide on how to setup your own music server to stream your local collection on the go, and how to sync it with your spotify collection using this tool
 
