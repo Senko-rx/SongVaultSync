@@ -1,10 +1,12 @@
-# Program that pulls songs from spotify API, sets them into a list, then uses that list (.json) to fetch the songs from a mp3 downloader and sets them into a folder, then zips the folder
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
 import base64
 import urllib.parse
 import json
 import os
 from dotenv import load_dotenv
+import webbrowser
 
 load_dotenv()
 
@@ -13,8 +15,28 @@ CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI")
 SCOPE = "user-library-read"
 
-auth_url = "https://accounts.spotify.com/authorize"
+auth_code = None
 
+# We run local server so that we can automate the fetching of the code from the callback response
+class Handler(BaseHTTPRequestHandler):
+    def do_get(self):
+        global auth_code
+        query = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(query)
+
+        if "code" in params:
+            auth_code = params["code"][0]
+
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"You can close this window.")
+            print("Code received!")
+
+
+server = HTTPServer(("127.0.0.1", 8888), Handler)
+
+auth_url = "https://accounts.spotify.com/authorize"
 params = {
     "client_id": CLIENT_ID,
     "response_type": "code",
@@ -24,20 +46,15 @@ params = {
 
 url = auth_url + "?" + urllib.parse.urlencode(params)
 
-print("\n👉 Open this URL in your browser:\n")
-print(url)
+webbrowser.open(url)
 
-redirect_response = input("\nPaste the FULL redirect URL here:\n")
-
-code = urllib.parse.parse_qs(
-    urllib.parse.urlparse(redirect_response).query
-)["code"][0]
+# Wait for redirect
+while auth_code is None:
+    server.handle_request()
 
 token_url = "https://accounts.spotify.com/api/token"
 
-auth_header = base64.b64encode(
-    f"{CLIENT_ID}:{CLIENT_SECRET}".encode()
-).decode()
+auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
 headers = {
     "Authorization": f"Basic {auth_header}",
@@ -46,7 +63,7 @@ headers = {
 
 data = {
     "grant_type": "authorization_code",
-    "code": code,
+    "code": auth_code,
     "redirect_uri": REDIRECT_URI
 }
 
@@ -54,6 +71,8 @@ response = requests.post(token_url, headers=headers, data=data)
 token_info = response.json()
 
 access_token = token_info["access_token"]
+
+print("Access token received! Requesting songs from Spotify")
 
 # Fetch liked songs (paginated)
 headers = {
