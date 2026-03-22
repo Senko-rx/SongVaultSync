@@ -13,6 +13,7 @@ from tqdm import tqdm
 class JsonToMp3:
 
     def _download_song(self, query):
+        # You can change this function to download from your appropriate place/API
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': 'webm/%(title)s.%(ext)s',
@@ -56,15 +57,15 @@ class JsonToMp3:
         with open(json_file, 'r', encoding='utf-8') as f:
             songs = json.load(f)
 
-        counter = 0
+        # counter = 0
 
         for song in songs:
             print(song)
             artist_string = " ".join(song["artists"])
             query = f"{artist_string} {song['name']}"
             self._download_song(query)
-            counter += 1
-            if counter >= 5:
-                break
+            # counter += 1
+            # if counter >= 5:
+            #     break
 
         self._convert_webm_to_mp3()
