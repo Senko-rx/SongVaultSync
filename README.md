@@ -57,7 +57,7 @@ REDIRECT_URI=http://127.0.0.1:8888/callback
 
 5. Run the program:
 ```bash
-python3 SongVault.py
+python3 songvault.py
 ```
 ## What it does
 
@@ -80,5 +80,5 @@ The app still needs to implement a proper rate limiter to respect Spotify's API 
 - The implementation of adding multiple playlists to the transfer queue
 - The implementation of a progress bar for long-running transfers
 - The ability to easily change the places you download your music from
-- Eventually a guide on how to setup your own music server to stream your local collection on the go, and how to sync it with your spotify collection using this tool
+- Eventually a guide on how to setup your own music server and use this tool to fetch your spotify collection and pull its songs from your music server, so that you can have your music collection available on all your devices without needing to download it on each of them.
 
