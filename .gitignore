@@ -3,4 +3,5 @@
 
 webm/*
 mp3/*
-list_data.json
+.cache
+*.json
