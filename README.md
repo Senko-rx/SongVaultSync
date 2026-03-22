@@ -1,11 +1,11 @@
-# SpotiGrab - The perfect tool for migrating your Spotify lists to your your local music collection
+# SongVault - The perfect tool for migrating your Spotify lists to your local music collection
 
-SpotiGrab is an application designed to help users transfer their Spotify playlists and liked songs to their local music collection. With a user-friendly CLI and automatic integration with the Spotify Web API, SpotiGrab makes it easy for users to create their music libraries and enjoy their favorite tracks offline.
+SongVault is an application designed to help users transfer their Spotify playlists and liked songs to their local music collection. With a user-friendly CLI and automatic integration with the Spotify Web API, SongVault makes it easy for users to create their music libraries and enjoy their favorite tracks offline.
 
 ## What to expect
-- **Playlist and Liked Songs Export**: SpotiGrab allows users to export their Spotify playlists and liked songs to a specified local directory.
+- **Playlist and Liked Songs Export**: SongVault allows users to export their Spotify playlists and liked songs to a specified local directory.
 - **Automatic Metadata Retrieval**: The application retrieves metadata for each track, including artist name, album name, and track title, to organize the downloaded music files properly. (TODO)
-- **Batch Processing**: SpotiGrab processes tracks in batches to optimise performance and handle large playlists efficiently.
+- **Batch Processing**: SongVault processes tracks in batches to optimise performance and handle large playlists efficiently.
 - **Error Handling**: The application includes error handling to manage issues such as network errors, API rate limits, and missing tracks gracefully.
 
 
@@ -21,8 +21,8 @@ SpotiGrab is an application designed to help users transfer their Spotify playli
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/Senko-rx/SpotiGrab.git
-cd SpotiGrab
+git clone https://github.com/Senko-rx/SongVault.git
+cd SongVault
 ```
 
 2. Install dependencies:
@@ -44,7 +44,7 @@ REDIRECT_URI=http://127.0.0.1:8888/callback
 
 5. Run the program:
 ```bash
-python3 spotigrab.py
+python3 SongVault.py
 ```
 ## What it does
 
