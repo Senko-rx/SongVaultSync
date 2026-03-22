@@ -82,10 +82,6 @@ class SpotifySyncToLocal:
 
             url = res["next"]
 
-        for s in songs:
-            artist_string = ", ".join(s["artists"])
-            print(f"{artist_string} - {s['name']}")
-
         with open('list_data.json', 'w') as f:
             json.dump(songs, f)
 
