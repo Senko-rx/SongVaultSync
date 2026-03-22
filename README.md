@@ -2,6 +2,18 @@
 
 SongVault is an application designed to help users transfer their Spotify playlists and liked songs to their local music collection. With a user-friendly CLI and automatic integration with the Spotify Web API, SongVault makes it easy for users to create their music libraries and enjoy their favorite tracks offline.
 
+> ## Disclaimer
+> This software is provided “as is”, without warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, non‑infringement, or any warranty that the software will operate without error. 
+> To the maximum extent permitted by applicable law, the authors and contributors shall not be liable for any damages whatsoever arising out of the use of or inability to use the software, including but not limited to direct, indirect, incidental, special, consequential, or punitive damages.
+> This tool may interact with third‑party services (e.g., Spotify’s API) and may be used with external content from sources such as media platforms. You are solely responsible for ensuring that your use of the software complies with all applicable laws, terms of service of third‑party providers, and copyrights. 
+> You should not use this software to violate the rights of others, including downloading material you are not authorised to access. By using this software, you agree that you assume all risks associated with its use.
+> The authors and distributors of this software do not endorse or encourage the violation of copyright laws or the terms of service of any service provider, and you should seek appropriate permissions from content owners before obtaining or using any copyrighted material.
+
+# Notes from the developer
+I heavily encourage paying artists for their work. Please ensure that you have the necessary rights to download and use the music in accordance with Spotify's, YouTube’s and any other parties you may want to use to download your music's terms of service and copyright laws.
+This program is meant to be used as a baseline and example for learning and implementing your own audio API interactions, so that you can sync your spotify collection with your local music collection, not as a tool for piracy!
+
+
 ## What to expect
 - **Playlist and Liked Songs Export**: SongVault allows users to export their Spotify playlists and liked songs to a specified local directory.
 - **Automatic Metadata Retrieval**: The application retrieves metadata for each track, including artist name, album name, and track title, to organize the downloaded music files properly. (TODO)
@@ -66,5 +78,3 @@ The app still needs to implement a proper rate limiter to respect Spotify's API 
 ## Future work
 Coaming soon!
 
-> ## Disclaimer
-> I heavily encourage paying artists for their work. Please ensure that you have the necessary rights to download and use the music in accordance with Spotify's terms of service and copyright laws.

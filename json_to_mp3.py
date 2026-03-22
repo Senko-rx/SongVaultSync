@@ -1,4 +1,4 @@
-# Maybe: Create url list of websites to fetch the song from
+# Maybe: Create url list of websites to fetch the song from (easy way of checking multiple music distros for where you may have bought your music)
 # Try to fetch the song from x and create a way to validate if the song is correct
 # Download the song on the local machine
 
@@ -23,7 +23,7 @@ class JsonToMp3:
             ydl.download([f"ytsearch1:{query}"])
 
     def _convert_webm_to_mp3(self):
-        # After full fetch of files from Youtube, we convert them to mp3 from webm (as per ydl implementation)
+        # After full fetch of files, we convert them to mp3 from webm (as per ydl implementation)
         # TODO: Check if album cover/thumbnail is also taken into mp3 file, otherwise add them separately
         WEBM_DIR = "webm/"
         MP3_DIR = "mp3/"
