@@ -4,3 +4,4 @@ yt-dlp
 requests
 python-dotenv
 yt-dlp-ejs
+mutagen
