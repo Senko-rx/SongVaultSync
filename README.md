@@ -59,6 +59,8 @@ REDIRECT_URI=http://127.0.0.1:8888/callback
 ```bash
 python3 songvaultsync.py
 ```
+
+6. Follow the steps the program presents
 ## What it does
 
 1. **Connect Accounts**: Authenticates your Spotify account using the provided credentials and retrieves an access token for API requests
@@ -69,16 +71,15 @@ python3 songvaultsync.py
 6. **Complete**: You now have a local copy of your Spotify playlists and liked songs, organised with metadata for easy access and enjoyment offline
 
 ## Contributing
-While this program was built for personal use, contributions are always welcome:
+While this program was built for personal use, contributions are always welcome
 
 ## Limitations
-The app still needs to implement a proper rate limiter to respect Spotify's API limits:
-- Automatic retry with exponential backoff
-- Progress tracking for long-running transfers
+The previous limitations noted here have been resolved with the latest commits. New ones that have been identified include:
+- The program should have built-in support for multiple music sources, so that users can easily switch between them without needing to change the code. This would allow users to download their music from different platforms, including their own music server, without needing to modify the code.
 
 ## Future work
-- The implementation of adding multiple playlists to the transfer queue
-- The implementation of a progress bar for long-running transfers
-- The ability to easily change the places you download your music from
-- Eventually a guide on how to setup your own music server and use this tool to fetch your spotify collection and pull its songs from your music server, so that you can have your music collection available on all your devices without needing to download it on each of them.
+- The implementation of adding multiple playlists to the transfer queue -> Done
+- The implementation of a progress bar for long-running transfers -> Done
+- The ability to easily change the places you download/sync your music from -> Modularisation of code to implement yourself, but not yet implemented
+- Eventually a guide on how to setup your own music server and use this tool to fetch your spotify collection and pull its songs from your music server, so that you can have your music collection available on all your devices without needing to download it on each of them. -> Slowely in the works
 
