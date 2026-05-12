@@ -8,9 +8,10 @@ from settings import WEBM_DIR, MP3_DIR
 
 
 class JsonToMp3:
-    def __init__(self, downloader, embed_metadata: bool = True):
+    def __init__(self, downloader, embed_metadata: bool = True, mp3_only: bool = False):
         self._downloader = downloader
         self._embed_metadata = embed_metadata
+        self._mp3_only = mp3_only
         self._webm_dir = Path(WEBM_DIR)
         self._mp3_dir = Path(MP3_DIR)
 
@@ -47,19 +48,21 @@ class JsonToMp3:
             track_id = track.get("id") or track["name"]
             query = self._build_query(track)
 
+            download_dir = self._mp3_dir if self._mp3_only else self._webm_dir
             try:
-                downloaded = self._downloader.download(query, track_id, self._webm_dir)
+                downloaded = self._downloader.download(query, track_id, download_dir)
             except DownloadError as exc:
                 print(f"\n  Download failed: {exc}")
                 failed.append(track.get("name", track_id))
                 continue
 
-            try:
-                convert_to_mp3(downloaded, mp3)
-            except ConversionError as exc:
-                print(f"\n  Conversion failed: {exc}")
-                failed.append(track.get("name", track_id))
-                continue
+            if not self._mp3_only:
+                try:
+                    convert_to_mp3(downloaded, mp3)
+                except ConversionError as exc:
+                    print(f"\n  Conversion failed: {exc}")
+                    failed.append(track.get("name", track_id))
+                    continue
 
             if self._embed_metadata:
                 embed(mp3, track)

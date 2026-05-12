@@ -62,6 +62,11 @@ def main() -> None:
         action="store_true",
         help="Skip embedding metadata and album art into mp3 files.",
     )
+    parser.add_argument(
+        "--mp3-only",
+        action="store_true",
+        help="Download and convert to mp3 in one step via yt-dlp, skipping the webm intermediate.",
+    )
     args = parser.parse_args()
 
     if args.from_catalog:
@@ -94,8 +99,9 @@ def main() -> None:
     with open("list_data.json", "w") as f:
         json.dump(all_songs, f, indent=2)
 
-    downloader = get_downloader(args.downloader)
-    orchestrator = JsonToMp3(downloader, embed_metadata=not args.no_metadata)
+    mp3_only = args.mp3_only
+    downloader = get_downloader(args.downloader, mp3_only=mp3_only)
+    orchestrator = JsonToMp3(downloader, embed_metadata=not args.no_metadata, mp3_only=mp3_only)
     orchestrator.json_to_mp3("list_data.json")
 
 
