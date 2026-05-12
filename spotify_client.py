@@ -34,3 +34,6 @@ class SpotifyClient:
             return response.json()
 
         raise SpotifyApiError(f"Request failed after {MAX_RETRIES} attempts: {last_error}")
+
+    def get_me(self) -> dict:
+        return self.get("https://api.spotify.com/v1/me")
