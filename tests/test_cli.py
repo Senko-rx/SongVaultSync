@@ -1,0 +1,35 @@
+from pathlib import Path
+
+import pytest
+
+from cli import build_parser
+
+
+def _parse(*argv):
+    return build_parser().parse_args(list(argv))
+
+
+def test_defaults():
+    args = _parse()
+    assert args.output_dir == Path(".")
+    assert args.format == "mp3"
+    assert args.bitrate == "128k"
+
+
+def test_output_options_are_parsed():
+    args = _parse("--output-dir", "~/Music", "--format", "opus", "--bitrate", "192k")
+    assert args.output_dir == Path("~/Music").expanduser()
+    assert args.format == "opus"
+    assert args.bitrate == "192k"
+
+
+@pytest.mark.parametrize("bad", ["192", "fast", "5k", "9999k", "-128k"])
+def test_rejects_invalid_bitrate(bad, capsys):
+    with pytest.raises(SystemExit):
+        _parse("--bitrate", bad)
+    assert "bitrate" in capsys.readouterr().err
+
+
+def test_rejects_unknown_format():
+    with pytest.raises(SystemExit):
+        _parse("--format", "flac")

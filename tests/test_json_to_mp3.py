@@ -25,7 +25,7 @@ class FakeDownloader:
         return path
 
 
-def _fake_convert(src: Path, dst: Path) -> None:
+def _fake_convert(src: Path, dst: Path, bitrate: str = "128k") -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(b"mp3")
 
@@ -39,7 +39,7 @@ def songs_file(tmp_path, monkeypatch):
 
 
 def _run(songs_file, downloader, convert=_fake_convert, **kwargs):
-    with patch("json_to_mp3.convert_to_mp3", side_effect=convert), patch("json_to_mp3.embed"):
+    with patch("json_to_mp3.convert_audio", side_effect=convert), patch("json_to_mp3.embed"):
         orchestrator = JsonToMp3(downloader, **kwargs)
         return orchestrator, orchestrator.json_to_mp3(songs_file)
 
@@ -86,7 +86,7 @@ def test_keeps_source_audio_by_default(songs_file):
 
 
 def test_keeps_source_audio_when_conversion_fails_in_mp3_only_mode(songs_file):
-    def _fail(src, dst):
+    def _fail(src, dst, bitrate):
         raise ConversionError("bad")
 
     _, available = _run(songs_file, FakeDownloader(), convert=_fail, mp3_only=True)
@@ -97,3 +97,26 @@ def test_keeps_source_audio_when_conversion_fails_in_mp3_only_mode(songs_file):
 def test_failed_download_is_not_available(songs_file):
     _, available = _run(songs_file, FakeDownloader(fail=True))
     assert available == {}
+
+
+def test_opus_format_writes_opus_files_in_opus_dir(songs_file):
+    _, available = _run(songs_file, FakeDownloader(), audio_format="opus")
+    assert available["t1"] == Path("opus") / "Artist - Song.opus"
+
+
+def test_output_dir_holds_all_generated_folders(songs_file, tmp_path):
+    out = tmp_path / "library"
+    _, available = _run(songs_file, FakeDownloader(), output_dir=out)
+    assert available["t1"] == out / "mp3" / "Artist - Song.mp3"
+    assert (out / "webm" / "t1.webm").exists()
+
+
+def test_bitrate_is_passed_to_converter(songs_file):
+    seen = {}
+
+    def _convert(src, dst, bitrate):
+        seen["bitrate"] = bitrate
+        _fake_convert(src, dst)
+
+    _run(songs_file, FakeDownloader(), convert=_convert, bitrate="256k")
+    assert seen["bitrate"] == "256k"

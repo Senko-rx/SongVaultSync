@@ -1,6 +1,7 @@
-WEBM_DIR = "webm/"
-MP3_DIR = "mp3/"
-PLAYLISTS_DIR = "playlists/"
+# Folder names inside the output directory. Converted files go in a folder named
+# after their format (mp3/ or opus/).
+SOURCE_AUDIO_DIR = "webm"
+PLAYLISTS_DIR = "playlists"
 
 AUDIO_BITRATE = "128k"
 SAMPLE_RATE = 44100

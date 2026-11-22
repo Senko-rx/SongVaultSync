@@ -1,5 +1,8 @@
+import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 TRACK = {
     "id": "abc123",
@@ -98,3 +101,49 @@ def test_embed_omits_extended_tags_when_fields_missing(tmp_path):
     tags = ID3(str(mp3))
     for frame in ("TPE2", "TRCK", "TDRC", "TSRC"):
         assert frame not in tags
+
+
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+
+
+def _make_opus(tmp_path: Path) -> Path:
+    import subprocess
+
+    path = tmp_path / "song.opus"
+    subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=1", "-c:a", "libopus", "-y", str(path)],
+        check=True,
+    )
+    return path
+
+
+@needs_ffmpeg
+def test_embed_writes_vorbis_comments_for_opus(tmp_path):
+    from mutagen.oggopus import OggOpus
+
+    import metadata_embedder
+
+    opus = _make_opus(tmp_path)
+    metadata_embedder.embed(opus, FULL_TRACK)
+
+    tags = OggOpus(str(opus))
+    assert tags["title"] == ["Test Song"]
+    assert tags["artist"] == ["Artist One", "Artist Two"]
+    assert tags["albumartist"] == ["Album Artist"]
+    assert tags["tracknumber"] == ["7"]
+    assert tags["date"] == ["2019-03-15"]
+    assert tags["isrc"] == ["USRC17607839"]
+
+
+@needs_ffmpeg
+def test_embed_adds_cover_picture_to_opus(tmp_path):
+    from mutagen.oggopus import OggOpus
+
+    import metadata_embedder
+
+    opus = _make_opus(tmp_path)
+    with patch("metadata_embedder.requests.get") as mock_get:
+        mock_get.return_value = MagicMock(content=b"jpegdata")
+        metadata_embedder.embed(opus, TRACK)
+
+    assert "metadata_block_picture" in OggOpus(str(opus))

@@ -1,6 +1,5 @@
 import json
 import sys
-from pathlib import Path
 
 from cli import build_parser
 from converter import ensure_ffmpeg
@@ -30,15 +29,24 @@ def main() -> None:
     all_songs = dedupe_tracks(tracks for _, tracks in groups)
     print(f"\nTotal unique tracks: {len(all_songs)}")
 
-    with open(LIST_FILE, "w", encoding="utf-8") as f:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    list_file = args.output_dir / LIST_FILE
+    with open(list_file, "w", encoding="utf-8") as f:
         json.dump(all_songs, f, indent=2)
 
-    downloader = get_downloader(args.downloader)
-    orchestrator = JsonToMp3(downloader, embed_metadata=not args.no_metadata, mp3_only=args.mp3_only)
-    available = orchestrator.json_to_mp3(LIST_FILE)
+    orchestrator = JsonToMp3(
+        get_downloader(args.downloader),
+        embed_metadata=not args.no_metadata,
+        mp3_only=args.mp3_only,
+        output_dir=args.output_dir,
+        audio_format=args.format,
+        bitrate=args.bitrate,
+    )
+    available = orchestrator.json_to_mp3(str(list_file))
 
-    written = write_playlists(groups, available, Path(PLAYLISTS_DIR))
-    print(f"Wrote {len(written)} playlist file(s) to {PLAYLISTS_DIR}")
+    playlists_dir = args.output_dir / PLAYLISTS_DIR
+    written = write_playlists(groups, available, playlists_dir)
+    print(f"Wrote {len(written)} playlist file(s) to {playlists_dir}")
 
 
 if __name__ == "__main__":
