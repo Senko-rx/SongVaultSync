@@ -12,3 +12,8 @@ SPOTIFY_SCOPES = " ".join([
 
 MAX_RETRIES = 5
 BACKOFF_BASE = 2
+
+# A search result is accepted only if its length is within this many seconds
+# of the Spotify track length. Guards against live versions, loops and covers.
+DURATION_TOLERANCE_SECONDS = 15
+SEARCH_CANDIDATES = 5

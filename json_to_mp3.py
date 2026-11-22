@@ -47,7 +47,9 @@ class JsonToMp3:
             query = self._build_query(track)
 
             try:
-                downloaded = self._downloader.download(query, track_id, self._webm_dir)
+                downloaded = self._downloader.download(
+                    query, track_id, self._webm_dir, duration_ms=track.get("duration_ms")
+                )
             except DownloadError as exc:
                 print(f"\n  Download failed: {exc}")
                 failed.append(track.get("name", track_id))
