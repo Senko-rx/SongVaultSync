@@ -48,21 +48,22 @@ class JsonToMp3:
             track_id = track.get("id") or track["name"]
             query = self._build_query(track)
 
-            download_dir = self._mp3_dir if self._mp3_only else self._webm_dir
             try:
-                downloaded = self._downloader.download(query, track_id, download_dir)
+                downloaded = self._downloader.download(query, track_id, self._webm_dir)
             except DownloadError as exc:
                 print(f"\n  Download failed: {exc}")
                 failed.append(track.get("name", track_id))
                 continue
 
-            if not self._mp3_only:
-                try:
-                    convert_to_mp3(downloaded, mp3)
-                except ConversionError as exc:
-                    print(f"\n  Conversion failed: {exc}")
-                    failed.append(track.get("name", track_id))
-                    continue
+            try:
+                convert_to_mp3(downloaded, mp3)
+            except ConversionError as exc:
+                print(f"\n  Conversion failed: {exc}")
+                failed.append(track.get("name", track_id))
+                continue
+
+            if self._mp3_only:
+                downloaded.unlink(missing_ok=True)
 
             if self._embed_metadata:
                 embed(mp3, track)

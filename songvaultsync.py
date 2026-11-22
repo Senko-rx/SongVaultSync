@@ -99,9 +99,8 @@ def main() -> None:
     with open("list_data.json", "w") as f:
         json.dump(all_songs, f, indent=2)
 
-    mp3_only = args.mp3_only
-    downloader = get_downloader(args.downloader, mp3_only=mp3_only)
-    orchestrator = JsonToMp3(downloader, embed_metadata=not args.no_metadata, mp3_only=mp3_only)
+    downloader = get_downloader(args.downloader)
+    orchestrator = JsonToMp3(downloader, embed_metadata=not args.no_metadata, mp3_only=args.mp3_only)
     orchestrator.json_to_mp3("list_data.json")
 
 
