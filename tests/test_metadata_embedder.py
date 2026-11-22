@@ -59,3 +59,42 @@ def test_embed_skips_art_when_no_url(tmp_path):
         metadata_embedder.embed(mp3, track_no_art)
 
     mock_get.assert_not_called()
+
+
+FULL_TRACK = {
+    **TRACK,
+    "album_cover_url": "",
+    "album_artists": ["Album Artist"],
+    "track_number": 7,
+    "release_date": "2019-03-15",
+    "isrc": "USRC17607839",
+}
+
+
+def test_embed_writes_extended_tags_readable_by_mutagen(tmp_path):
+    from mutagen.id3 import ID3
+
+    import metadata_embedder
+
+    mp3 = _make_mp3(tmp_path)
+    metadata_embedder.embed(mp3, FULL_TRACK)
+
+    tags = ID3(str(mp3))
+    assert str(tags["TPE2"]) == "Album Artist"
+    assert str(tags["TRCK"]) == "7"
+    assert str(tags["TDRC"]) == "2019-03-15"
+    assert str(tags["TSRC"]) == "USRC17607839"
+
+
+def test_embed_omits_extended_tags_when_fields_missing(tmp_path):
+    # Older catalog.json exports don't carry these fields.
+    from mutagen.id3 import ID3
+
+    import metadata_embedder
+
+    mp3 = _make_mp3(tmp_path)
+    metadata_embedder.embed(mp3, {**TRACK, "album_cover_url": ""})
+
+    tags = ID3(str(mp3))
+    for frame in ("TPE2", "TRCK", "TDRC", "TSRC"):
+        assert frame not in tags

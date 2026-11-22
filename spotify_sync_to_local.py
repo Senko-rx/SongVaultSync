@@ -43,6 +43,24 @@ def callback_address(redirect_uri: str) -> tuple[str, int]:
     return parsed.hostname, parsed.port or DEFAULT_HTTP_PORT
 
 
+def _track_record(track: dict) -> dict:
+    """Reduce a Spotify track object to the fields the downloader and tagger use."""
+    album = track.get("album") or {}
+    images = album.get("images") or []
+    return {
+        "id": track["id"],
+        "name": track["name"],
+        "artists": [a["name"] for a in track["artists"]],
+        "album": album.get("name", ""),
+        "album_artists": [a["name"] for a in album.get("artists", [])],
+        "album_cover_url": images[0]["url"] if images else "",
+        "release_date": album.get("release_date", ""),
+        "track_number": track.get("track_number"),
+        "duration_ms": track.get("duration_ms", 0),
+        "isrc": track.get("external_ids", {}).get("isrc", ""),
+    }
+
+
 class SpotifySyncToLocal:
     def __init__(self) -> None:
         self._client_id, self._client_secret, self._redirect_uri = load_credentials()
@@ -129,16 +147,7 @@ class SpotifySyncToLocal:
                 track = item.get("track")
                 if track is None:
                     continue
-                images = track.get("album", {}).get("images", [])
-                songs.append({
-                    "id": track["id"],
-                    "name": track["name"],
-                    "artists": [a["name"] for a in track["artists"]],
-                    "album": track.get("album", {}).get("name", ""),
-                    "album_cover_url": images[0]["url"] if images else "",
-                    "duration_ms": track.get("duration_ms", 0),
-                    "isrc": track.get("external_ids", {}).get("isrc", ""),
-                })
+                songs.append(_track_record(track))
             url = data.get("next")
 
         print(f"Fetched {len(songs)} tracks from '{source}'")
