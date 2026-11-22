@@ -1,5 +1,6 @@
 WEBM_DIR = "webm/"
 MP3_DIR = "mp3/"
+PLAYLISTS_DIR = "playlists/"
 
 AUDIO_BITRATE = "128k"
 SAMPLE_RATE = 44100
