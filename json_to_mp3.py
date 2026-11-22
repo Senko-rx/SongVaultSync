@@ -1,4 +1,5 @@
 import json
+import os
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -10,7 +11,7 @@ from converter import convert_audio
 from errors import ConversionError, DownloadError
 from metadata_embedder import embed
 from settings import AUDIO_BITRATE, SOURCE_AUDIO_DIR
-from track_utils import assign_filenames, safe_filename, track_key
+from track_utils import assign_filenames, temp_stem, track_key
 
 
 @dataclass(frozen=True)
@@ -47,27 +48,49 @@ class JsonToMp3:
             return f"{artists} {name} {isrc}"
         return f"{artists} {name}"
 
-    def _adopt_legacy_file(self, key: str, target: Path) -> bool:
-        """Earlier versions named files '<spotify_id>.<ext>'; rename instead of re-downloading."""
-        legacy = self._music_dir / f"{safe_filename(key)}.{self._format}"
-        if legacy == target or not legacy.is_file():
+    def _adopt_legacy_file(self, track: dict, target: Path) -> bool:
+        """Earlier versions named files '<spotify_id>.<ext>'; rename instead of re-downloading.
+
+        Only real Spotify IDs qualify: an ID-less track's old name was its bare title,
+        which may now be a different track's file.
+        """
+        track_id = track.get("id")
+        if not track_id:
             return False
-        legacy.rename(target)
+        legacy = self._music_dir / f"{track_id}.{self._format}"
+        if legacy == target or not legacy.is_file() or target.exists():
+            return False
+        os.replace(legacy, target)
         return True
 
     def _process(self, track: dict, target: Path) -> None:
-        """Download, convert and tag one track. Raises DownloadError or ConversionError."""
+        """Download, convert and tag one track. Raises DownloadError or ConversionError.
+
+        Work happens on a hidden '.part' file that is renamed into place only when
+        complete, so an interrupted or failed run never leaves a file that a later run
+        would mistake for a finished track.
+        """
         downloaded = self._downloader.download(
-            self._build_query(track),
-            safe_filename(track_key(track)),
-            self._webm_dir,
-            duration_ms=track.get("duration_ms"),
+            self._build_query(track), temp_stem(track), self._webm_dir, duration_ms=track.get("duration_ms")
         )
-        convert_audio(downloaded, target, bitrate=self._bitrate)
+        partial = target.with_name(f".{target.stem}.part{target.suffix}")
+        try:
+            convert_audio(downloaded, partial, bitrate=self._bitrate)
+            if self._embed_metadata:
+                self._tag(partial, track)
+            os.replace(partial, target)
+        finally:
+            partial.unlink(missing_ok=True)
         if self._mp3_only:
             downloaded.unlink(missing_ok=True)
-        if self._embed_metadata:
-            embed(target, track)
+
+    @staticmethod
+    def _tag(path: Path, track: dict) -> None:
+        """Tagging problems cost the tags, not the track: the audio is still worth keeping."""
+        try:
+            embed(path, track)
+        except Exception as exc:
+            tqdm.write(f"  Warning: could not tag '{track.get('name')}': {type(exc).__name__}: {exc}")
 
     def json_to_mp3(self, json_file: str) -> SyncResult:
         """Process every track in json_file; report which tracks have a file and which failed."""
@@ -87,7 +110,7 @@ class JsonToMp3:
             for track in songs:
                 key = track_key(track)
                 target = self._music_dir / f"{filenames[key]}.{self._format}"
-                if target.exists() or self._adopt_legacy_file(key, target):
+                if target.exists() or self._adopt_legacy_file(track, target):
                     available[key] = target
                     progress.update()
                 elif key not in pending:
@@ -98,26 +121,33 @@ class JsonToMp3:
                 if error is None:
                     available[key] = target
                 else:
-                    tqdm.write(f"  {type(error).__name__}: {error}")
-                    failed.append({**track, "error": str(error)})
+                    tqdm.write(f"  Failed '{track.get('name')}': {error}")
+                    failed.append({**track, "error": error})
                 progress.update()
 
         _report([track.get("name") or track_key(track) for track in failed])
         return SyncResult(available=available, failed=failed)
 
-    def _attempt(self, track: dict, target: Path) -> Exception | None:
+    def _attempt(self, track: dict, target: Path) -> str | None:
+        """Run one track; return an error message instead of raising, so one bad track can't stop the run."""
         try:
             self._process(track, target)
         except (DownloadError, ConversionError) as exc:
-            return exc
+            return str(exc)
+        except Exception as exc:
+            return f"{type(exc).__name__}: {exc}"
         return None
 
-    def _run_pending(self, pending: dict[str, tuple[dict, Path]]) -> Iterator[tuple[str, Exception | None]]:
-        """Yield (track key, error or None) as tracks finish. Unexpected errors propagate."""
-        with ThreadPoolExecutor(max_workers=self._workers) as pool:
+    def _run_pending(self, pending: dict[str, tuple[dict, Path]]) -> Iterator[tuple[str, str | None]]:
+        """Yield (track key, error message or None) as tracks finish."""
+        pool = ThreadPoolExecutor(max_workers=self._workers)
+        try:
             futures = {pool.submit(self._attempt, *job): key for key, job in pending.items()}
             for future in as_completed(futures):
                 yield futures[future], future.result()
+        finally:
+            # On Ctrl-C (or the caller stopping early) drop queued tracks instead of finishing them all.
+            pool.shutdown(wait=True, cancel_futures=True)
 
 
 def _report(failed: list[str]) -> None:

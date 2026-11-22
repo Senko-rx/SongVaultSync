@@ -154,3 +154,49 @@ def test_parallel_run_reports_same_results_as_sequential(songs_file):
     result = _run(songs_file, FakeDownloader(), workers=3)
     assert sorted(result.available) == [f"t{i}" for i in range(6)]
     assert result.failed == []
+
+
+def test_failed_conversion_leaves_no_partial_file(songs_file):
+    def _partial_then_fail(src, dst, bitrate):
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(b"half")
+        raise ConversionError("killed")
+
+    _run(songs_file, FakeDownloader(), convert=_partial_then_fail)
+    assert list(Path("mp3").iterdir()) == []
+
+
+def test_tagging_error_keeps_track_with_warning(songs_file, capsys):
+    with patch("json_to_mp3.convert_audio", side_effect=_fake_convert), \
+         patch("json_to_mp3.embed", side_effect=ValueError("corrupt header")):
+        result = JsonToMp3(FakeDownloader()).json_to_mp3(songs_file)
+    assert result.available["t1"].exists()
+    captured = capsys.readouterr()
+    assert "corrupt header" in captured.out + captured.err
+
+
+def test_tracks_without_id_get_distinct_temp_names(songs_file):
+    songs = [{"id": None, "name": "a/b", "artists": []}, {"id": None, "name": "a?b", "artists": []}]
+    Path(songs_file).write_text(json.dumps(songs), encoding="utf-8")
+    downloader = FakeDownloader()
+    _run(songs_file, downloader)
+    temp_names = [call[1] for call in downloader.calls]
+    assert len(set(temp_names)) == 2
+
+
+def test_legacy_rename_only_applies_to_spotify_ids(songs_file):
+    # An ID-less track's "legacy" name is just its title, which may belong to another file.
+    Path(songs_file).write_text(json.dumps([{"id": None, "name": "Song", "artists": ["X"]}]), encoding="utf-8")
+    Path("mp3").mkdir()
+    Path("mp3/Song.mp3").write_bytes(b"someone else")
+    _run(songs_file, FakeDownloader())
+    assert Path("mp3/Song.mp3").read_bytes() == b"someone else"
+
+
+def test_unexpected_worker_error_is_reported_as_failure_not_crash(songs_file):
+    class ExplodingDownloader(FakeDownloader):
+        def download(self, *args, **kwargs):
+            raise OSError("disk full")
+
+    result = _run(songs_file, ExplodingDownloader(), workers=2)
+    assert result.failed[0]["error"] == "OSError: disk full"

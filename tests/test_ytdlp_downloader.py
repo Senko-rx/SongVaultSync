@@ -18,9 +18,28 @@ def test_duration_filter_rejects_far_match_with_reason():
     assert isinstance(reason, str) and "10 hour loop" in reason
 
 
-def test_duration_filter_accepts_unknown_duration():
+def test_duration_filter_defers_unknown_duration_on_incomplete_entries():
+    # Flat search entries may not carry a duration yet; yt-dlp re-checks the full info.
     accept = duration_filter(expected_ms=200_000, tolerance_s=15)
-    assert accept({}, incomplete=False) is None
+    assert accept({}, incomplete=True) is None
+
+
+def test_duration_filter_rejects_unknown_duration_on_full_info():
+    accept = duration_filter(expected_ms=200_000, tolerance_s=15)
+    assert accept({"title": "mystery"}, incomplete=False) is not None
+
+
+def test_duration_filter_rejects_live_streams():
+    accept = duration_filter(expected_ms=200_000, tolerance_s=15)
+    assert accept({"duration": 200, "is_live": True}, incomplete=False) is not None
+
+
+def test_download_ignores_leftover_partial_and_metadata_files(tmp_path):
+    for leftover in ("t1.webm.part", "t1.ytdl", "t1.info.json"):
+        (tmp_path / leftover).touch()
+    ctx, _ = _fake_ydl(tmp_path)
+    with patch("downloaders.ytdlp_downloader.yt_dlp.YoutubeDL", return_value=ctx):
+        assert YtDlpDownloader().download("A Song", "t1", tmp_path) == tmp_path / "t1.webm"
 
 
 def _fake_ydl(out_dir, side_effect=None, create_file=True):
@@ -64,3 +83,14 @@ def test_download_raises_when_no_candidate_matches_duration(tmp_path):
     with patch("downloaders.ytdlp_downloader.yt_dlp.YoutubeDL", return_value=ctx):
         with pytest.raises(DownloadError, match="length"):
             YtDlpDownloader().download("A Song", "t1", tmp_path, duration_ms=200_000)
+
+
+def test_download_sets_network_timeout_and_escapes_template(tmp_path):
+    out = tmp_path / "100%"
+    out.mkdir()
+    ctx, _ = _fake_ydl(out)
+    with patch("downloaders.ytdlp_downloader.yt_dlp.YoutubeDL", return_value=ctx) as cls:
+        YtDlpDownloader().download("A Song", "t1", out)
+    opts = cls.call_args[0][0]
+    assert opts["socket_timeout"] > 0
+    assert "100%%" in opts["outtmpl"]

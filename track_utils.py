@@ -1,3 +1,4 @@
+import hashlib
 import re
 from collections.abc import Iterable
 
@@ -63,3 +64,15 @@ def assign_filenames(tracks: Iterable[dict]) -> dict[str, str]:
         taken.add(stem.lower())
         names[key] = stem
     return names
+
+
+def temp_stem(track: dict) -> str:
+    """Name for the downloaded intermediate file, unique per track.
+
+    Spotify IDs are already filesystem-safe; ID-less local files get a hash so two
+    titles that sanitize to the same string never share (or delete) a temp file.
+    """
+    if track.get("id"):
+        return track["id"]
+    digest = hashlib.sha1(track_key(track).encode("utf-8")).hexdigest()[:12]
+    return f"local-{digest}"

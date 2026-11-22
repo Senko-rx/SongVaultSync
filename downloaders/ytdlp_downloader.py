@@ -9,6 +9,9 @@ from errors import DownloadError
 from settings import DURATION_TOLERANCE_SECONDS, SEARCH_CANDIDATES
 
 MatchFilter = Callable[..., str | None]
+SOCKET_TIMEOUT_SECONDS = 30
+NETWORK_RETRIES = 3
+LEFTOVER_SUFFIXES = {".part", ".ytdl", ".json", ".temp"}
 
 
 def duration_filter(expected_ms: int, tolerance_s: int = DURATION_TOLERANCE_SECONDS) -> MatchFilter:
@@ -16,10 +19,16 @@ def duration_filter(expected_ms: int, tolerance_s: int = DURATION_TOLERANCE_SECO
     expected_s = expected_ms / 1000
 
     def _accept(info: dict, *, incomplete: bool = False) -> str | None:
+        title = info.get("title", "?")
+        if info.get("is_live"):
+            return f"'{title}' is a live stream"
         duration = info.get("duration")
-        if duration is None or abs(duration - expected_s) <= tolerance_s:
+        if duration is None:
+            # Search listings may omit durations; yt-dlp calls again with full info.
+            return None if incomplete else f"'{title}' has no known length"
+        if abs(duration - expected_s) <= tolerance_s:
             return None
-        return f"'{info.get('title', '?')}' is {duration:.0f}s, expected ~{expected_s:.0f}s"
+        return f"'{title}' is {duration:.0f}s, expected ~{expected_s:.0f}s"
 
     return _accept
 
@@ -29,9 +38,12 @@ class YtDlpDownloader:
         out_dir.mkdir(parents=True, exist_ok=True)
         ydl_opts = {
             "format": "bestaudio/best",
-            "outtmpl": str(out_dir / f"{track_id}.%(ext)s"),
+            # '%' is yt-dlp template syntax; escape it in the literal part of the path.
+            "outtmpl": str(out_dir / track_id).replace("%", "%%") + ".%(ext)s",
             "quiet": True,
             "no_warnings": True,
+            "socket_timeout": SOCKET_TIMEOUT_SECONDS,
+            "retries": NETWORK_RETRIES,
         }
         search = f"ytsearch1:{query}"
         if duration_ms:
@@ -48,12 +60,17 @@ class YtDlpDownloader:
         except Exception as exc:
             raise DownloadError(f"Failed to download '{query}': {exc}") from exc
 
-        # Escape: catalog tracks without an ID fall back to their title, which may contain [ ] * ?
-        matches = list(out_dir.glob(f"{glob.escape(track_id)}.*"))
+        matches = _downloaded_files(out_dir, track_id)
         if not matches:
             if duration_ms:
                 raise DownloadError(
                     f"No result for '{query}' within {DURATION_TOLERANCE_SECONDS}s of the expected length"
                 )
             raise DownloadError(f"No file found after downloading '{query}'")
-        return matches[0]
+        return max(matches, key=lambda path: path.stat().st_mtime)
+
+
+def _downloaded_files(out_dir: Path, stem: str) -> list[Path]:
+    """Finished audio files named '<stem>.<ext>', ignoring yt-dlp's partial and metadata files."""
+    candidates = out_dir.glob(f"{glob.escape(stem)}.*")
+    return [path for path in candidates if path.suffix not in LEFTOVER_SUFFIXES and path.stem == stem]

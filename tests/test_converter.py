@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -102,3 +103,38 @@ def test_unsupported_extension_raises(tmp_path):
 
     with pytest.raises(ConversionError, match="Unsupported"):
         converter.convert_audio(tmp_path / "in.webm", tmp_path / "out.wav")
+
+
+def test_ffmpeg_does_not_read_stdin_and_has_timeout(tmp_path):
+    import subprocess
+
+    import converter
+
+    src = tmp_path / "in.webm"
+    src.touch()
+    with patch("converter.subprocess.run", return_value=MagicMock(returncode=0)) as mock_run:
+        converter.convert_audio(src, tmp_path / "out.mp3")
+    args, kwargs = mock_run.call_args
+    assert "-nostdin" in args[0]
+    assert kwargs["stdin"] is subprocess.DEVNULL
+    assert kwargs["timeout"] > 0
+
+
+def test_ffmpeg_timeout_becomes_conversion_error(tmp_path):
+    import subprocess
+
+    import converter
+
+    with patch("converter.subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 1)):
+        with pytest.raises(ConversionError, match="timed out"):
+            converter.convert_audio(tmp_path / "in.webm", tmp_path / "out.mp3")
+
+
+def test_ffmpeg_gets_absolute_paths(tmp_path, monkeypatch):
+    import converter
+
+    monkeypatch.chdir(tmp_path)
+    with patch("converter.subprocess.run", return_value=MagicMock(returncode=0)) as mock_run:
+        converter.convert_audio(Path("-weird/in.webm"), Path("-weird/out.mp3"))
+    args = mock_run.call_args[0][0]
+    assert not any(arg.startswith("-weird") for arg in args)

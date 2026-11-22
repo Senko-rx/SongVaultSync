@@ -7,6 +7,8 @@ from errors import ConversionError
 from settings import AUDIO_BITRATE, SAMPLE_RATE
 
 SUPPORTED_FORMATS = ("mp3", "opus")
+FFMPEG_TIMEOUT_SECONDS = 600  # far longer than any song needs; stops a hung ffmpeg from blocking a worker
+STDERR_TAIL_CHARS = 300
 
 
 def ensure_ffmpeg() -> None:
@@ -16,9 +18,23 @@ def ensure_ffmpeg() -> None:
         sys.exit(1)
 
 
-def _ffmpeg(src: Path, dst: Path, codec_args: list[str]) -> int:
-    command = ["ffmpeg", "-i", str(src), "-vn", *codec_args, "-y", str(dst)]
-    return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+def _ffmpeg(src: Path, dst: Path, codec_args: list[str]) -> tuple[int, str]:
+    # Absolute paths so a name starting with '-' can never be read as an option;
+    # -nostdin so parallel ffmpeg processes don't fight over the terminal.
+    command = ["ffmpeg", "-nostdin", "-i", str(src.absolute()), "-vn", *codec_args, "-y", str(dst.absolute())]
+    try:
+        result = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            timeout=FFMPEG_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConversionError(f"ffmpeg timed out after {FFMPEG_TIMEOUT_SECONDS}s converting '{src}'") from exc
+    return result.returncode, (result.stderr or "")[-STDERR_TAIL_CHARS:].strip()
 
 
 def convert_audio(src: Path, dst: Path, bitrate: str = AUDIO_BITRATE) -> None:
@@ -36,9 +52,9 @@ def convert_audio(src: Path, dst: Path, bitrate: str = AUDIO_BITRATE) -> None:
     else:
         raise ConversionError(f"Unsupported output format '{dst.suffix}'. Use one of {SUPPORTED_FORMATS}.")
 
-    returncode = 1
+    returncode, stderr = 1, ""
     for codec_args in attempts:
-        returncode = _ffmpeg(src, dst, codec_args)
+        returncode, stderr = _ffmpeg(src, dst, codec_args)
         if returncode == 0:
             return
-    raise ConversionError(f"ffmpeg failed converting '{src}' (exit code {returncode})")
+    raise ConversionError(f"ffmpeg failed converting '{src}' (exit code {returncode}): {stderr}")
