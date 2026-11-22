@@ -18,3 +18,49 @@ def test_dedupe_keeps_all_tracks_without_id():
 
 def test_dedupe_empty_input():
     assert dedupe_tracks([]) == []
+
+
+from track_utils import assign_filenames, safe_filename, track_key  # noqa: E402
+
+
+def _song(track_id, name, artists=("Artist",)):
+    return {"id": track_id, "name": name, "artists": list(artists)}
+
+
+def test_safe_filename_replaces_forbidden_characters():
+    assert safe_filename('AC/DC: "Back" <In> Black?*|\\') == "AC_DC_ _Back_ _In_ Black____"
+
+
+def test_safe_filename_strips_trailing_dots_and_spaces():
+    assert safe_filename("  Song...  ") == "Song"
+
+
+def test_safe_filename_truncates_long_names():
+    assert len(safe_filename("x" * 500)) <= 150
+
+
+def test_assign_filenames_uses_artist_and_title():
+    names = assign_filenames([_song("a", "Song", ["Artist One", "Artist Two"])])
+    assert names["a"] == "Artist One, Artist Two - Song"
+
+
+def test_assign_filenames_suffixes_collisions_with_id():
+    names = assign_filenames([_song("id_first", "Song"), _song("id_second", "Song")])
+    assert names["id_first"] == "Artist - Song"
+    assert names["id_second"] == "Artist - Song [id_secon]"
+
+
+def test_assign_filenames_collision_is_case_insensitive():
+    # Case-insensitive filesystems (macOS, Windows) treat these as the same file.
+    names = assign_filenames([_song("a", "Song"), _song("b", "SONG")])
+    assert names["a"] != names["b"]
+
+
+def test_assign_filenames_falls_back_to_key_when_name_empty():
+    names = assign_filenames([{"id": "abc", "name": "", "artists": []}])
+    assert names["abc"] == "abc"
+
+
+def test_track_key_prefers_id_then_name():
+    assert track_key({"id": "abc", "name": "Song"}) == "abc"
+    assert track_key({"id": None, "name": "Local Song"}) == "Local Song"
