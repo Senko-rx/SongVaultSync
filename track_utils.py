@@ -1,6 +1,7 @@
 import hashlib
 import re
-from collections.abc import Iterable
+import unicodedata
+from collections.abc import Iterable, Mapping
 
 
 def dedupe_tracks(groups: Iterable[list[dict]]) -> list[dict]:
@@ -22,47 +23,77 @@ def dedupe_tracks(groups: Iterable[list[dict]]) -> list[dict]:
     return merged
 
 
-# Characters that are invalid in file names on Windows, macOS or Linux, plus control chars.
+# Characters that are invalid in file names on Windows, macOS or Linux, plus ASCII control chars.
 _FORBIDDEN = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
-MAX_FILENAME_LENGTH = 150  # leaves room for the directory and extension under common path limits
+# Other control, formatting (bidi overrides, zero-width) and line/paragraph separators: removed.
+_INVISIBLE_CATEGORIES = {"Cc", "Cf", "Zl", "Zp"}
+_WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+MAX_FILENAME_BYTES = 200  # under the common 255-byte limit, leaving room for '.part' and the extension
 COLLISION_ID_LENGTH = 8
+UNTITLED = "untitled"
 
 
 def track_key(track: dict) -> str:
-    """Stable identifier for a track: its Spotify ID, or its title for ID-less local files."""
-    return track.get("id") or track["name"]
+    """Stable identifier: the Spotify ID, or 'local:<Artist - Title>' for ID-less local files."""
+    if track.get("id"):
+        return track["id"]
+    return f"local:{display_name(track) or UNTITLED}"
 
 
-def safe_filename(name: str) -> str:
+def _truncate_bytes(text: str, limit: int) -> str:
+    return text.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+
+
+def safe_filename(name: str, max_bytes: int = MAX_FILENAME_BYTES) -> str:
     """Make a string safe to use as a file name on any common filesystem."""
-    cleaned = _FORBIDDEN.sub("_", name)[:MAX_FILENAME_LENGTH]
-    return cleaned.strip().rstrip(". ").strip()
+    cleaned = _FORBIDDEN.sub("_", name)
+    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) not in _INVISIBLE_CATEGORIES)
+    cleaned = _truncate_bytes(cleaned, max_bytes).strip().rstrip(". ").strip()
+    if cleaned.split(".")[0].upper() in _WINDOWS_RESERVED:
+        cleaned = f"_{cleaned}"
+    return cleaned
 
 
 def display_name(track: dict) -> str:
-    """Human-readable "Artist, Artist - Title" label, without a dangling dash when parts are missing."""
+    """Human-readable "Artist, Artist - Title" label on one line, without a dangling dash."""
     artists = ", ".join(track.get("artists") or [])
     title = track.get("name") or ""
-    return f"{artists} - {title}" if artists and title else title or artists
+    label = f"{artists} - {title}" if artists and title else title or artists
+    return " ".join(label.split())  # collapses newlines/tabs that would break playlist files
 
 
-def assign_filenames(tracks: Iterable[dict]) -> dict[str, str]:
+def _short_id(track: dict) -> str:
+    return (track.get("id") or hashlib.sha1(track_key(track).encode("utf-8")).hexdigest())[:COLLISION_ID_LENGTH]
+
+
+def _unique_stem(track: dict, taken: set[str]) -> str:
+    base = safe_filename(display_name(track)) or safe_filename(track.get("id") or "") or UNTITLED
+    if base.lower() not in taken:
+        return base
+    tag, counter = _short_id(track), 1
+    while True:  # the ID suffix is almost always enough; the counter is a last resort
+        suffix = f" [{tag}]" if counter == 1 else f" [{tag}-{counter}]"
+        stem = safe_filename(base, MAX_FILENAME_BYTES - len(suffix.encode("utf-8"))) + suffix
+        if stem.lower() not in taken:
+            return stem
+        counter += 1
+
+
+def assign_filenames(tracks: Iterable[dict], existing: Mapping[str, str] | None = None) -> dict[str, str]:
     """Map each track key to a unique 'Artist - Title' file stem (no extension).
 
-    When two different tracks would share a name (case-insensitively, for macOS and
-    Windows), later ones get a short ID suffix so neither overwrites the other.
+    Names in `existing` (from earlier runs) are kept and count as taken, so a track's
+    file name doesn't depend on which other tracks are in this run. When two tracks
+    would share a name (case-insensitively, for macOS and Windows), the newcomer gets
+    a short ID suffix.
     """
-    names: dict[str, str] = {}
-    taken: set[str] = set()
+    names: dict[str, str] = dict(existing or {})
+    taken = {stem.lower() for stem in names.values()}
     for track in tracks:
         key = track_key(track)
-        if key in names:
-            continue
-        stem = safe_filename(display_name(track)) or safe_filename(key)
-        if stem.lower() in taken:
-            stem = f"{stem} [{safe_filename(key)[:COLLISION_ID_LENGTH]}]"
-        taken.add(stem.lower())
-        names[key] = stem
+        if key not in names:
+            names[key] = _unique_stem(track, taken)
+            taken.add(names[key].lower())
     return names
 
 

@@ -200,3 +200,14 @@ def test_unexpected_worker_error_is_reported_as_failure_not_crash(songs_file):
 
     result = _run(songs_file, ExplodingDownloader(), workers=2)
     assert result.failed[0]["error"] == "OSError: disk full"
+
+
+def test_file_names_are_remembered_across_runs(songs_file):
+    a = {"id": "aaa", "name": "Song", "artists": ["Artist"]}
+    b = {"id": "bbb", "name": "Song", "artists": ["Artist"]}
+    Path(songs_file).write_text(json.dumps([a, b]), encoding="utf-8")
+    first = _run(songs_file, FakeDownloader()).available
+
+    Path(songs_file).write_text(json.dumps([b]), encoding="utf-8")  # e.g. --retry-failed or --source subset
+    second = _run(songs_file, FakeDownloader()).available
+    assert second["bbb"] == first["bbb"] != first["aaa"]

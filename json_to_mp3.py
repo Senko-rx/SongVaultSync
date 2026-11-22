@@ -10,7 +10,7 @@ from tqdm import tqdm
 from converter import convert_audio
 from errors import ConversionError, DownloadError
 from metadata_embedder import embed
-from settings import AUDIO_BITRATE, SOURCE_AUDIO_DIR
+from settings import AUDIO_BITRATE, NAMES_FILE, SOURCE_AUDIO_DIR
 from track_utils import assign_filenames, temp_stem, track_key
 
 
@@ -38,7 +38,16 @@ class JsonToMp3:
         self._format = audio_format
         self._bitrate = bitrate
         self._webm_dir = Path(output_dir) / SOURCE_AUDIO_DIR
+        self._manifest = Path(output_dir) / NAMES_FILE
         self._music_dir = Path(output_dir) / audio_format
+
+    def _assign_names(self, songs: list[dict]) -> dict[str, str]:
+        """Assign file names, reusing earlier runs' choices so names never shift between runs."""
+        names = assign_filenames(songs, existing=_load_manifest(self._manifest))
+        tmp = self._manifest.with_name(self._manifest.name + ".tmp")
+        tmp.write_text(json.dumps(names, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, self._manifest)
+        return names
 
     def _build_query(self, track: dict) -> str:
         artists = " ".join(track.get("artists", []))
@@ -100,7 +109,7 @@ class JsonToMp3:
         self._music_dir.mkdir(parents=True, exist_ok=True)
         self._webm_dir.mkdir(parents=True, exist_ok=True)
 
-        filenames = assign_filenames(songs)
+        filenames = self._assign_names(songs)
         available: dict[str, Path] = {}
         failed: list[dict] = []
         pending: dict[str, tuple[dict, Path]] = {}
@@ -148,6 +157,20 @@ class JsonToMp3:
         finally:
             # On Ctrl-C (or the caller stopping early) drop queued tracks instead of finishing them all.
             pool.shutdown(wait=True, cancel_futures=True)
+
+
+def _load_manifest(path: Path) -> dict[str, str]:
+    """Read {track key: file stem}; a missing or damaged manifest just means starting fresh."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as exc:
+        tqdm.write(f"  Warning: ignoring unreadable {path}: {exc}")
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {key: stem for key, stem in data.items() if isinstance(key, str) and isinstance(stem, str) and stem}
 
 
 def _report(failed: list[str]) -> None:

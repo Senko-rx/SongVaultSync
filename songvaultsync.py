@@ -9,7 +9,7 @@ from json_to_mp3 import JsonToMp3
 from playlist_writer import write_playlists
 from settings import PLAYLISTS_DIR
 from sources import TrackGroup, fetch_spotify_groups, load_catalog_groups, load_failed_groups, save_failed
-from track_utils import dedupe_tracks
+from track_utils import dedupe_tracks, track_key
 
 LIST_FILE = "list_data.json"
 FAILED_FILE = "failed.json"
@@ -49,7 +49,7 @@ def main() -> None:
     result = orchestrator.json_to_mp3(str(list_file))
 
     failed_file = args.output_dir / FAILED_FILE
-    save_failed(failed_file, result.failed)
+    save_failed(failed_file, result.failed, attempted_keys={track_key(t) for t in all_songs})
     if result.failed:
         print(f"Failed tracks saved to {failed_file}. Retry them with --retry-failed.")
 

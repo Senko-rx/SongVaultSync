@@ -6,6 +6,7 @@ from pathlib import Path
 from playlist_selector import select_sources
 from spotify_client import SpotifyClient
 from spotify_sync_to_local import SpotifySyncToLocal
+from track_utils import track_key
 
 LIKED_SONGS_NAME = "Liked Songs"
 RETRY_GROUP_NAME = "Retry failed"
@@ -47,13 +48,22 @@ def fetch_spotify_groups(requested: list[str] | None, download_all: bool) -> lis
     return [(source_name(source, names), sync.fetch_tracks(client, source)) for source in sources]
 
 
-def save_failed(path: Path, failed: list[dict]) -> None:
-    """Record failed tracks for --retry-failed, or clear the record when nothing failed."""
-    if not failed:
+def save_failed(path: Path, failed: list[dict], attempted_keys: set[str]) -> None:
+    """Update the failure record for --retry-failed.
+
+    Earlier failures for tracks this run didn't attempt (e.g. a different --source)
+    are kept; tracks this run attempted are replaced by this run's outcome.
+    """
+    previous = []
+    if path.is_file():
+        with open(path, encoding="utf-8") as f:
+            previous = json.load(f)
+    merged = [track for track in previous if track_key(track) not in attempted_keys] + failed
+    if not merged:
         path.unlink(missing_ok=True)
         return
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(failed, f, indent=2, ensure_ascii=False)
+        json.dump(merged, f, indent=2, ensure_ascii=False)
 
 
 def load_failed_groups(path: Path) -> list[TrackGroup]:

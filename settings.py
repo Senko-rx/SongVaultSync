@@ -2,6 +2,8 @@
 # after their format (mp3/ or opus/).
 SOURCE_AUDIO_DIR = "webm"
 PLAYLISTS_DIR = "playlists"
+# Remembers each track's file name so names stay the same across runs.
+NAMES_FILE = "names.json"
 
 AUDIO_BITRATE = "128k"
 SAMPLE_RATE = 44100

@@ -47,6 +47,6 @@ def test_overwrites_existing_playlist_on_rerun(tmp_path):
 
 def test_extinf_label_omits_dash_when_track_has_no_artists(tmp_path):
     track = {"id": None, "name": "Local File", "artists": [], "duration_ms": 2000}
-    available = {"Local File": tmp_path / "mp3" / "Local File.mp3"}
+    available = {"local:Local File": tmp_path / "mp3" / "Local File.mp3"}
     [path] = write_playlists([("Mix", [track])], available, tmp_path / "playlists")
     assert "#EXTINF:2,Local File" in path.read_text(encoding="utf-8").splitlines()
