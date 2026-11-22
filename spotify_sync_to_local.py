@@ -1,5 +1,4 @@
 import base64
-import json
 import os
 import secrets
 import urllib.parse
@@ -112,24 +111,3 @@ class SpotifySyncToLocal:
 
         print(f"Fetched {len(songs)} tracks from '{source}'")
         return songs
-
-    def sync(self, sources: list[str] | None = None) -> list[dict]:
-        access_token = self.get_access_token()
-        client = SpotifyClient(access_token)
-
-        if sources is None:
-            sources = ["liked"]
-
-        all_songs: list[dict] = []
-        seen_ids: set[str] = set()
-        for source in sources:
-            for track in self.fetch_tracks(client, source):
-                if track["id"] not in seen_ids:
-                    seen_ids.add(track["id"])
-                    all_songs.append(track)
-
-        with open("list_data.json", "w") as f:
-            json.dump(all_songs, f, indent=2)
-
-        print(f"\nTotal unique tracks: {len(all_songs)}")
-        return all_songs

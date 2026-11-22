@@ -21,10 +21,6 @@ class JsonToMp3:
         track_id = track.get("id") or track["name"]
         return self._mp3_dir / f"{track_id}.mp3"
 
-    def _webm_path(self, track: dict) -> Path:
-        track_id = track.get("id") or track["name"]
-        return self._webm_dir / f"{track_id}.webm"
-
     def _build_query(self, track: dict) -> str:
         artists = " ".join(track.get("artists", []))
         name = track.get("name", "")

@@ -7,30 +7,16 @@ from json_to_mp3 import JsonToMp3
 from playlist_selector import select_sources
 from spotify_client import SpotifyClient
 from spotify_sync_to_local import SpotifySyncToLocal
+from track_utils import dedupe_tracks
 
 
 def _flatten_catalog(catalog_file: str) -> list[dict]:
     with open(catalog_file, encoding="utf-8") as f:
         catalog = json.load(f)
 
-    all_songs: list[dict] = []
-    seen_ids: set[str] = set()
-
-    def _add(track: dict) -> None:
-        track_id = track.get("id")
-        if track_id and track_id in seen_ids:
-            return
-        if track_id:
-            seen_ids.add(track_id)
-        all_songs.append(track)
-
-    for track in catalog.get("liked_songs", {}).get("tracks", []):
-        _add(track)
-    for playlist in catalog.get("playlists", []):
-        for track in playlist.get("tracks", []):
-            _add(track)
-
-    return all_songs
+    groups = [catalog.get("liked_songs", {}).get("tracks", [])]
+    groups += [playlist.get("tracks", []) for playlist in catalog.get("playlists", [])]
+    return dedupe_tracks(groups)
 
 
 def main() -> None:
@@ -89,13 +75,7 @@ def main() -> None:
             playlists = sync.list_playlists(client)
             sources = select_sources(playlists)
 
-        all_songs = []
-        seen_ids: set[str] = set()
-        for source in sources:
-            for track in sync.fetch_tracks(client, source):
-                if track["id"] not in seen_ids:
-                    seen_ids.add(track["id"])
-                    all_songs.append(track)
+        all_songs = dedupe_tracks(sync.fetch_tracks(client, source) for source in sources)
 
         print(f"\nTotal unique tracks: {len(all_songs)}")
 
