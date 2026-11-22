@@ -1,12 +1,14 @@
 """Collect tracks grouped by the playlist they came from, so playlists can be rebuilt locally."""
 
 import json
+from pathlib import Path
 
 from playlist_selector import select_sources
 from spotify_client import SpotifyClient
 from spotify_sync_to_local import SpotifySyncToLocal
 
 LIKED_SONGS_NAME = "Liked Songs"
+RETRY_GROUP_NAME = "Retry failed"
 
 TrackGroup = tuple[str, list[dict]]
 
@@ -43,3 +45,21 @@ def fetch_spotify_groups(requested: list[str] | None, download_all: bool) -> lis
 
     names = {pl["id"]: pl["name"] for pl in playlists}
     return [(source_name(source, names), sync.fetch_tracks(client, source)) for source in sources]
+
+
+def save_failed(path: Path, failed: list[dict]) -> None:
+    """Record failed tracks for --retry-failed, or clear the record when nothing failed."""
+    if not failed:
+        path.unlink(missing_ok=True)
+        return
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(failed, f, indent=2, ensure_ascii=False)
+
+
+def load_failed_groups(path: Path) -> list[TrackGroup]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Nothing to retry: {path} does not exist.")
+    with open(path, encoding="utf-8") as f:
+        failed = json.load(f)
+    tracks = [{key: value for key, value in track.items() if key != "error"} for track in failed]
+    return [(RETRY_GROUP_NAME, tracks)]

@@ -41,11 +41,11 @@ def songs_file(tmp_path, monkeypatch):
 def _run(songs_file, downloader, convert=_fake_convert, **kwargs):
     with patch("json_to_mp3.convert_audio", side_effect=convert), patch("json_to_mp3.embed"):
         orchestrator = JsonToMp3(downloader, **kwargs)
-        return orchestrator, orchestrator.json_to_mp3(songs_file)
+        return orchestrator.json_to_mp3(songs_file)
 
 
 def test_names_mp3_by_artist_and_title(songs_file):
-    orch, available = _run(songs_file, FakeDownloader())
+    available = _run(songs_file, FakeDownloader()).available
     assert available["t1"].name == "Artist - Song.mp3"
     assert available["t1"].exists()
 
@@ -60,7 +60,7 @@ def test_skips_tracks_that_already_exist(songs_file):
     Path("mp3").mkdir()
     Path("mp3/Artist - Song.mp3").write_bytes(b"old")
     downloader = FakeDownloader()
-    _, available = _run(songs_file, downloader)
+    available = _run(songs_file, downloader).available
     assert downloader.calls == []
     assert "t1" in available
 
@@ -69,7 +69,7 @@ def test_renames_legacy_id_named_file_instead_of_downloading(songs_file):
     Path("mp3").mkdir()
     Path("mp3/t1.mp3").write_bytes(b"legacy")
     downloader = FakeDownloader()
-    _, available = _run(songs_file, downloader)
+    available = _run(songs_file, downloader).available
     assert downloader.calls == []
     assert available["t1"].read_bytes() == b"legacy"
     assert not Path("mp3/t1.mp3").exists()
@@ -89,24 +89,24 @@ def test_keeps_source_audio_when_conversion_fails_in_mp3_only_mode(songs_file):
     def _fail(src, dst, bitrate):
         raise ConversionError("bad")
 
-    _, available = _run(songs_file, FakeDownloader(), convert=_fail, mp3_only=True)
+    available = _run(songs_file, FakeDownloader(), convert=_fail, mp3_only=True).available
     assert Path("webm/t1.webm").exists()
     assert available == {}
 
 
 def test_failed_download_is_not_available(songs_file):
-    _, available = _run(songs_file, FakeDownloader(fail=True))
+    available = _run(songs_file, FakeDownloader(fail=True)).available
     assert available == {}
 
 
 def test_opus_format_writes_opus_files_in_opus_dir(songs_file):
-    _, available = _run(songs_file, FakeDownloader(), audio_format="opus")
+    available = _run(songs_file, FakeDownloader(), audio_format="opus").available
     assert available["t1"] == Path("opus") / "Artist - Song.opus"
 
 
 def test_output_dir_holds_all_generated_folders(songs_file, tmp_path):
     out = tmp_path / "library"
-    _, available = _run(songs_file, FakeDownloader(), output_dir=out)
+    available = _run(songs_file, FakeDownloader(), output_dir=out).available
     assert available["t1"] == out / "mp3" / "Artist - Song.mp3"
     assert (out / "webm" / "t1.webm").exists()
 
@@ -120,3 +120,10 @@ def test_bitrate_is_passed_to_converter(songs_file):
 
     _run(songs_file, FakeDownloader(), convert=_convert, bitrate="256k")
     assert seen["bitrate"] == "256k"
+
+
+def test_failed_tracks_are_returned_with_error(songs_file):
+    result = _run(songs_file, FakeDownloader(fail=True))
+    [failed] = result.failed
+    assert failed["id"] == "t1"
+    assert failed["error"] == "nope"

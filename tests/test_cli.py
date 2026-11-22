@@ -33,3 +33,8 @@ def test_rejects_invalid_bitrate(bad, capsys):
 def test_rejects_unknown_format():
     with pytest.raises(SystemExit):
         _parse("--format", "flac")
+
+
+def test_retry_failed_cannot_be_combined_with_other_sources():
+    with pytest.raises(SystemExit):
+        _parse("--retry-failed", "--all")

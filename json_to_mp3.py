@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from tqdm import tqdm
@@ -8,6 +9,12 @@ from errors import ConversionError, DownloadError
 from metadata_embedder import embed
 from settings import AUDIO_BITRATE, SOURCE_AUDIO_DIR
 from track_utils import assign_filenames, safe_filename, track_key
+
+
+@dataclass(frozen=True)
+class SyncResult:
+    available: dict[str, Path] = field(default_factory=dict)  # track key -> audio file
+    failed: list[dict] = field(default_factory=list)  # track dicts plus an "error" message
 
 
 class JsonToMp3:
@@ -58,8 +65,8 @@ class JsonToMp3:
         if self._embed_metadata:
             embed(target, track)
 
-    def json_to_mp3(self, json_file: str) -> dict[str, Path]:
-        """Process every track in json_file. Returns {track key: audio file path} for tracks that have a file."""
+    def json_to_mp3(self, json_file: str) -> SyncResult:
+        """Process every track in json_file; report which tracks have a file and which failed."""
         with open(json_file, encoding="utf-8") as f:
             songs = json.load(f)
 
@@ -68,7 +75,7 @@ class JsonToMp3:
 
         filenames = assign_filenames(songs)
         available: dict[str, Path] = {}
-        failed: list[str] = []
+        failed: list[dict] = []
 
         for track in tqdm(songs, desc="Downloading", unit="track"):
             key = track_key(track)
@@ -80,12 +87,12 @@ class JsonToMp3:
                 self._process(track, target)
             except (DownloadError, ConversionError) as exc:
                 print(f"\n  {type(exc).__name__}: {exc}")
-                failed.append(track.get("name", key))
+                failed.append({**track, "error": str(exc)})
                 continue
             available[key] = target
 
-        _report(failed)
-        return available
+        _report([track.get("name") or track_key(track) for track in failed])
+        return SyncResult(available=available, failed=failed)
 
 
 def _report(failed: list[str]) -> None:

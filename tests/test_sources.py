@@ -28,3 +28,32 @@ def test_source_name_resolves_ids():
     assert source_name("liked", names) == LIKED_SONGS_NAME
     assert source_name("pl1", names) == "Chill"
     assert source_name("unknown", names) == "unknown"
+
+
+def test_failed_tracks_round_trip_without_error_field(tmp_path):
+    from sources import RETRY_GROUP_NAME, load_failed_groups, save_failed
+
+    path = tmp_path / "failed.json"
+    save_failed(path, [{"id": "a", "name": "A", "error": "timeout"}])
+
+    [(name, tracks)] = load_failed_groups(path)
+    assert name == RETRY_GROUP_NAME
+    assert tracks == [{"id": "a", "name": "A"}]
+
+
+def test_save_failed_with_no_failures_removes_stale_file(tmp_path):
+    from sources import save_failed
+
+    path = tmp_path / "failed.json"
+    path.write_text("[]", encoding="utf-8")
+    save_failed(path, [])
+    assert not path.exists()
+
+
+def test_load_failed_groups_explains_missing_file(tmp_path):
+    import pytest
+
+    from sources import load_failed_groups
+
+    with pytest.raises(FileNotFoundError, match="Nothing to retry"):
+        load_failed_groups(tmp_path / "failed.json")

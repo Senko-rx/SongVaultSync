@@ -8,13 +8,16 @@ from errors import SpotifyAuthError
 from json_to_mp3 import JsonToMp3
 from playlist_writer import write_playlists
 from settings import PLAYLISTS_DIR
-from sources import TrackGroup, fetch_spotify_groups, load_catalog_groups
+from sources import TrackGroup, fetch_spotify_groups, load_catalog_groups, load_failed_groups, save_failed
 from track_utils import dedupe_tracks
 
 LIST_FILE = "list_data.json"
+FAILED_FILE = "failed.json"
 
 
 def _collect_groups(args) -> list[TrackGroup]:
+    if args.retry_failed:
+        return load_failed_groups(args.output_dir / FAILED_FILE)
     if args.from_catalog:
         print(f"Loading tracks from {args.from_catalog}")
         return load_catalog_groups(args.from_catalog)
@@ -42,15 +45,23 @@ def main() -> None:
         audio_format=args.format,
         bitrate=args.bitrate,
     )
-    available = orchestrator.json_to_mp3(str(list_file))
+    result = orchestrator.json_to_mp3(str(list_file))
 
+    failed_file = args.output_dir / FAILED_FILE
+    save_failed(failed_file, result.failed)
+    if result.failed:
+        print(f"Failed tracks saved to {failed_file}. Retry them with --retry-failed.")
+
+    if args.retry_failed:
+        print("Playlists are not rebuilt on retry; rerun your usual sync to refresh them (existing files are skipped).")
+        return
     playlists_dir = args.output_dir / PLAYLISTS_DIR
-    written = write_playlists(groups, available, playlists_dir)
+    written = write_playlists(groups, result.available, playlists_dir)
     print(f"Wrote {len(written)} playlist file(s) to {playlists_dir}")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except SpotifyAuthError as exc:
+    except (SpotifyAuthError, FileNotFoundError) as exc:
         sys.exit(f"Error: {exc}")

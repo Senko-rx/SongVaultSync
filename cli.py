@@ -29,19 +29,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SongVaultSync: sync your Spotify playlists to local mp3 files."
     )
-    parser.add_argument(
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="Retry only the tracks listed in failed.json from the previous run.",
+    )
+    source_group.add_argument(
         "--from-catalog",
         metavar="FILE",
         help="Skip Spotify auth and download from an existing catalog.json export.",
     )
-    parser.add_argument(
+    source_group.add_argument(
         "--source",
         action="append",
         dest="sources",
         metavar="PLAYLIST_ID|liked",
         help="Source to download: 'liked' or a Spotify playlist ID. Repeatable.",
     )
-    parser.add_argument(
+    source_group.add_argument(
         "--all",
         action="store_true",
         help="Download liked songs and all playlists.",
