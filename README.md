@@ -16,8 +16,10 @@ This program is meant to be used as a baseline and example for learning and impl
 
 ## What to expect
 - **Playlist and Liked Songs Export**: SongVaultSync allows users to export their Spotify playlists and liked songs to a specified local directory.
-- **Automatic Metadata Retrieval**: The application retrieves metadata for each track, including artist name, album name, and track title, to organize the downloaded music files properly. (TODO)
-- **Batch Processing**: SongVaultSync processes tracks in batches to optimise performance and handle large playlists efficiently.
+- **Automatic Metadata**: Each file is tagged with title, artists, album, album artist, track number, release date, ISRC and cover art (ID3 for mp3, Vorbis comments for opus), and named `Artist - Title`.
+- **Playlist Files**: Every synced source (Liked Songs and each playlist) is written as an `.m3u8` playlist that any music player can open.
+- **Wrong-Song Protection**: Search results are only accepted if their length is within 15 seconds of the Spotify track, which filters out live versions, extended mixes and loops.
+- **Resumable and Parallel**: Tracks that already exist are skipped, failures are saved for `--retry-failed`, and `--workers` downloads several tracks at once.
 - **Error Handling**: The application includes error handling to manage issues such as network errors, API rate limits, and missing tracks gracefully.
 
 
@@ -25,7 +27,7 @@ This program is meant to be used as a baseline and example for learning and impl
 
 ### Prerequisites
 
-- Python 3 (3.14 was used during development)
+- Python 3.11 or newer (3.14 was used during development)
 - A Spotify Developer account
 - Spotify application credentials
 - FFMPEG
@@ -53,7 +55,7 @@ REDIRECT_URI=http://127.0.0.1:8888/callback
 
 4. Configure your Spotify app:
    - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   - Add redirect URIs: `http://127.0.0.1:8888/callback`
+   - Add redirect URIs: `http://127.0.0.1:8888/callback` (it must match `REDIRECT_URI` exactly; the local callback server listens on that host and port)
 
 5. Run the program:
 ```bash
@@ -61,6 +63,50 @@ python3 songvaultsync.py
 ```
 
 6. Follow the steps the program presents
+
+## Usage
+
+```bash
+python3 songvaultsync.py                          # pick sources from an interactive menu
+python3 songvaultsync.py --all                    # liked songs + every playlist
+python3 songvaultsync.py --source liked --source <PLAYLIST_ID>
+python3 songvaultsync.py --all --output-dir ~/Music/Spotify --format opus --workers 4
+python3 songvaultsync.py --retry-failed           # retry only what failed last time
+```
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Download liked songs and all playlists |
+| `--source liked\|PLAYLIST_ID` | Download a specific source; repeatable |
+| `--from-catalog FILE` | Skip Spotify login and download from a `catalog.json` export (see below) |
+| `--retry-failed` | Retry only the tracks recorded in `failed.json` by the previous run |
+| `--output-dir DIR` | Where to put everything (default: current directory) |
+| `--format mp3\|opus` | Output format (default: mp3). `opus` keeps YouTube's audio without re-encoding when possible |
+| `--bitrate 192k` | Encoding bitrate, 32k-320k (default: 128k) |
+| `--workers N` | Download N tracks in parallel, 1-8 (default: 1) |
+| `--mp3-only` | Delete the downloaded source audio after converting, keeping only the converted file |
+| `--no-metadata` | Don't embed tags or cover art |
+| `--downloader NAME` | Downloader backend (default: `ytdlp`) |
+
+`--all`, `--source`, `--from-catalog` and `--retry-failed` are mutually exclusive.
+
+### Offline catalog
+
+`python3 export_catalog.py` saves your liked songs and all playlists to `catalog.json`. Later, `python3 songvaultsync.py --from-catalog catalog.json` downloads from that file without logging in to Spotify.
+
+### Output layout
+
+```
+<output-dir>/
+├── mp3/              # or opus/ — "Artist - Title.mp3", fully tagged
+├── playlists/        # "Liked Songs.m3u8", "<Playlist name>.m3u8"
+├── webm/             # downloaded source audio (removed per track with --mp3-only)
+├── failed.json       # only present if some tracks failed
+└── list_data.json    # the track list used for the last run
+```
+
+Upgrading from an older version that named files `<spotify_id>.mp3`? Those files are renamed to `Artist - Title.mp3` automatically on the next run instead of being downloaded again.
+
 ## What it does
 
 1. **Connect Accounts**: Authenticates your Spotify account using the provided credentials and retrieves an access token for API requests
@@ -71,7 +117,13 @@ python3 songvaultsync.py
 6. **Complete**: You now have a local copy of your Spotify playlists and liked songs, organised with metadata for easy access and enjoyment offline
 
 ## Contributing
-While this program was built for personal use, contributions are always welcome
+While this program was built for personal use, contributions are always welcome.
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q tests   # unit tests
+ruff check .                # lint (the same checks CI runs)
+```
 
 ## Limitations
 The previous limitations noted here have been resolved with the latest commits. New ones that have been identified include:
