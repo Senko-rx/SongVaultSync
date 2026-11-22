@@ -1,8 +1,10 @@
 import argparse
 import json
+import sys
 
 from converter import ensure_ffmpeg
 from downloaders import get_downloader
+from errors import SpotifyAuthError
 from json_to_mp3 import JsonToMp3
 from playlist_selector import select_sources
 from spotify_client import SpotifyClient
@@ -88,4 +90,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SpotifyAuthError as exc:
+        sys.exit(f"Error: {exc}")

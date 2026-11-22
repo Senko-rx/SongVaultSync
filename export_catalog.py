@@ -1,6 +1,8 @@
 import json
+import sys
 from datetime import UTC, datetime
 
+from errors import SpotifyAuthError
 from spotify_client import SpotifyClient
 from spotify_sync_to_local import SpotifySyncToLocal
 
@@ -61,4 +63,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SpotifyAuthError as exc:
+        sys.exit(f"Error: {exc}")
