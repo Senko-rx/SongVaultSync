@@ -55,7 +55,7 @@ REDIRECT_URI=http://127.0.0.1:8888/callback
 
 4. Configure your Spotify app:
    - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   - Add redirect URIs: `http://127.0.0.1:8888/callback` (it must match `REDIRECT_URI` exactly; the local callback server listens on that host and port)
+   - Add redirect URIs: `http://127.0.0.1:8888/callback` (it must match `REDIRECT_URI` exactly and use `127.0.0.1` or `localhost`; the local callback server listens on that host and port)
 
 5. Run the program:
 ```bash
@@ -102,6 +102,7 @@ python3 songvaultsync.py --retry-failed           # retry only what failed last 
 ├── playlists/        # "Liked Songs.m3u8", "<Playlist name>.m3u8"
 ├── webm/             # downloaded source audio (removed per track with --mp3-only)
 ├── failed.json       # only present if some tracks failed
+├── names.json        # remembers each track's file name so names never change between runs
 └── list_data.json    # the track list used for the last run
 ```
 
