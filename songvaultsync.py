@@ -1,7 +1,8 @@
 import json
 import sys
 
-from cli import build_parser
+from car_export import CarExportError, export_car
+from cli import parse_args
 from converter import ensure_ffmpeg
 from downloaders import get_downloader
 from errors import SpotifyAuthError
@@ -25,7 +26,7 @@ def _collect_groups(args) -> list[TrackGroup]:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    args = parse_args()
     ensure_ffmpeg()
 
     groups = _collect_groups(args)
@@ -54,15 +55,31 @@ def main() -> None:
         print(f"Failed tracks saved to {failed_file}. Retry them with --retry-failed.")
 
     if args.retry_failed:
-        print("Playlists are not rebuilt on retry; rerun your usual sync to refresh them (existing files are skipped).")
+        print(
+            "Playlists and the car export are not rebuilt on retry; "
+            "rerun your usual sync to refresh them (existing files are skipped)."
+        )
         return
     playlists_dir = args.output_dir / PLAYLISTS_DIR
     written = write_playlists(groups, result.available, playlists_dir)
     print(f"Wrote {len(written)} playlist file(s) to {playlists_dir}")
+    if args.car is not None:
+        _export_for_car(groups, result.available, args.car)
+
+
+def _export_for_car(groups: list[TrackGroup], available: dict, car_dir) -> None:
+    print(f"\nExporting car copy to {car_dir} ...")
+    report = export_car(groups, available, car_dir)
+    print(
+        f"Car export: {report.files_written} file(s) written, {report.folders_unchanged} folder(s) unchanged, "
+        f"{report.folders_removed} removed."
+    )
+    for warning in report.warnings:
+        print(f"  Warning: {warning}")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (SpotifyAuthError, FileNotFoundError) as exc:
+    except (SpotifyAuthError, FileNotFoundError, CarExportError) as exc:
         sys.exit(f"Error: {exc}")

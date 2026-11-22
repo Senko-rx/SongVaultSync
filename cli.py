@@ -46,6 +46,21 @@ def directory(value: str) -> Path:
     return Path(value).expanduser()
 
 
+CAR_IN_OUTPUT_DIR = Path("\0car-in-output-dir")  # sentinel: '--car' given without a directory
+CAR_SUBDIR = "car"
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse arguments and apply checks that involve more than one option."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.car is not None and args.format != "mp3":
+        parser.error("--car requires --format mp3 (older car stereos can't play opus)")
+    if args.car == CAR_IN_OUTPUT_DIR:
+        args.car = args.output_dir / CAR_SUBDIR
+    return args
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SongVaultSync: sync your Spotify playlists to local mp3 files."
@@ -107,6 +122,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=bitrate,
         default=AUDIO_BITRATE,
         help=f"Encoding bitrate, e.g. 192k (default: {AUDIO_BITRATE}). Ignored when opus is remuxed.",
+    )
+    parser.add_argument(
+        "--car",
+        nargs="?",
+        const=CAR_IN_OUTPUT_DIR,
+        type=directory,
+        metavar="DIR",
+        help=(
+            "Also export a copy for older car stereos: one numbered folder per playlist, ID3v2.3+v1 tags, "
+            "no cover art, ASCII names, max 255 files per folder. Writes to DIR (an empty folder, e.g. on "
+            "the USB stick) or to <output-dir>/car if DIR is omitted. Requires --format mp3."
+        ),
     )
     parser.add_argument(
         "--workers",

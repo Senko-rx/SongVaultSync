@@ -59,3 +59,29 @@ def test_source_accepts_liked_and_spotify_ids():
 def test_source_rejects_non_ids(bad):
     with pytest.raises(SystemExit):
         _parse("--source", bad)
+
+
+def test_car_is_off_by_default():
+    from cli import parse_args
+
+    assert parse_args([]).car is None
+
+
+def test_car_without_dir_goes_inside_output_dir():
+    from cli import parse_args
+
+    assert parse_args(["--car", "--output-dir", "lib"]).car == Path("lib") / "car"
+
+
+def test_car_with_dir_uses_it():
+    from cli import parse_args
+
+    assert parse_args(["--car", "/media/stick/Music"]).car == Path("/media/stick/Music")
+
+
+def test_car_requires_mp3(capsys):
+    from cli import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args(["--car", "--format", "opus"])
+    assert "--car" in capsys.readouterr().err

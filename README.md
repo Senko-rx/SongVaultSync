@@ -84,6 +84,7 @@ python3 songvaultsync.py --retry-failed           # retry only what failed last 
 | `--format mp3\|opus` | Output format (default: mp3). `opus` keeps YouTube's audio without re-encoding when possible |
 | `--bitrate 192k` | Encoding bitrate, 32k-320k (default: 128k) |
 | `--workers N` | Download N tracks in parallel, 1-8 (default: 1) |
+| `--car [DIR]` | Also export a copy for older car stereos to `DIR` (default: `<output-dir>/car`); see below |
 | `--mp3-only` | Delete the downloaded source audio after converting, keeping only the converted file |
 | `--no-metadata` | Don't embed tags or cover art |
 | `--downloader NAME` | Downloader backend (default: `ytdlp`) |
@@ -93,6 +94,33 @@ python3 songvaultsync.py --retry-failed           # retry only what failed last 
 ### Offline catalog
 
 `python3 export_catalog.py` saves your liked songs and all playlists to `catalog.json`. Later, `python3 songvaultsync.py --from-catalog catalog.json` downloads from that file without logging in to Spotify.
+
+### Car / USB stick (`--car`)
+
+Older car stereos (for example a 2012 Toyota Yaris) usually can't use playlist files, only read some tag versions reliably, and stop listing files past fixed limits. `--car` builds a separate copy that works around all of that, without touching your main library:
+
+```
+car/
+├── 01 Liked Songs/
+│   ├── 001 Artist - Title.mp3
+│   └── 002 ...
+├── 02 Road Trip/          (playlists over 255 tracks continue in "02 Road Trip (2)")
+└── .songvaultsync-car.json
+```
+
+- One numbered folder per playlist, files numbered in playlist order. Browse by folder on the stereo.
+- MP3 only (`--format mp3`), ID3v2.3 + ID3v1 tags, track number = position in the playlist, no cover art.
+- Plain-ASCII file and folder names (`Beyoncé – Halo` → `Beyonce - Halo`).
+- At most 255 files per folder; warns above 999 folders or 9,999 files (the limits in Toyota manuals of that era).
+- Re-running only rewrites folders whose contents changed, and it only ever deletes folders it created itself. It refuses to write into a non-empty folder it didn't create.
+
+To write straight to a FAT32/VFAT stick, point it at an empty folder on the stick and eject before unplugging:
+
+```bash
+python3 songvaultsync.py --all --car /run/media/$USER/STICK/Music
+```
+
+Many stereos play files in the order they were written to the stick rather than alphabetically. Folders are always rewritten in order, but if you later add playlists and the folder order looks off, run [`fatsort`](https://fatsort.sourceforge.io/) on the unmounted stick.
 
 ### Output layout
 
