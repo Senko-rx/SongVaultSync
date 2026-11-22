@@ -1,6 +1,7 @@
 from pathlib import Path
+
 import requests
-from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, ID3NoHeaderError
+from mutagen.id3 import APIC, ID3, TALB, TIT2, TPE1, ID3NoHeaderError
 
 
 def embed(mp3_path: Path, track_meta: dict) -> None:

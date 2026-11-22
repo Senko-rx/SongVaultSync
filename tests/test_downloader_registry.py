@@ -1,5 +1,6 @@
 import pytest
-from downloaders import get_downloader, DOWNLOADERS
+
+from downloaders import DOWNLOADERS, get_downloader
 from downloaders.ytdlp_downloader import YtDlpDownloader
 
 

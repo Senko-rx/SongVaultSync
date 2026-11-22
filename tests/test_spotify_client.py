@@ -1,7 +1,8 @@
-import responses as responses_lib
 import pytest
-from spotify_client import SpotifyClient
+import responses as responses_lib
+
 from errors import SpotifyApiError
+from spotify_client import SpotifyClient
 
 URL = "https://api.spotify.com/v1/me/tracks"
 

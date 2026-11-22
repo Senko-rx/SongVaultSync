@@ -1,8 +1,8 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from spotify_sync_to_local import SpotifySyncToLocal
 from spotify_client import SpotifyClient
+from spotify_sync_to_local import SpotifySyncToLocal
 
 OUTPUT_FILE = "catalog.json"
 
@@ -33,7 +33,7 @@ def build_catalog(sync: SpotifySyncToLocal, client: SpotifyClient) -> dict:
         })
 
     return {
-        "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exported_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "account": account,
         "liked_songs": liked_songs,
         "playlists": playlists,

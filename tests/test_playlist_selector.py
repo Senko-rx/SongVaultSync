@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from playlist_selector import select_sources
 
 PLAYLISTS = [

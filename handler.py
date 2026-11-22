@@ -1,5 +1,5 @@
-from http.server import BaseHTTPRequestHandler
 import urllib.parse
+from http.server import BaseHTTPRequestHandler
 
 
 class Handler(BaseHTTPRequestHandler):

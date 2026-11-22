@@ -1,7 +1,9 @@
 import time
+
 import requests
-from settings import MAX_RETRIES, BACKOFF_BASE
+
 from errors import SpotifyApiError
+from settings import BACKOFF_BASE, MAX_RETRIES
 
 
 class SpotifyClient:

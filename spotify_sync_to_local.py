@@ -1,15 +1,17 @@
-from http.server import HTTPServer
-import requests
 import base64
-import urllib.parse
 import json
 import os
 import secrets
+import urllib.parse
 import webbrowser
+from http.server import HTTPServer
+
+import requests
 from dotenv import load_dotenv
+
 from handler import Handler
-from spotify_client import SpotifyClient
 from settings import SPOTIFY_SCOPES
+from spotify_client import SpotifyClient
 
 load_dotenv()
 

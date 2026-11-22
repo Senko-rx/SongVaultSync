@@ -1,10 +1,12 @@
-from pathlib import Path
 import json
+from pathlib import Path
+
 from tqdm import tqdm
+
 from converter import convert_to_mp3
+from errors import ConversionError, DownloadError
 from metadata_embedder import embed
-from errors import DownloadError, ConversionError
-from settings import WEBM_DIR, MP3_DIR
+from settings import MP3_DIR, WEBM_DIR
 
 
 class JsonToMp3:
@@ -32,7 +34,7 @@ class JsonToMp3:
         return f"{artists} {name}"
 
     def json_to_mp3(self, json_file: str) -> None:
-        with open(json_file, "r", encoding="utf-8") as f:
+        with open(json_file, encoding="utf-8") as f:
             songs = json.load(f)
 
         self._mp3_dir.mkdir(parents=True, exist_ok=True)
