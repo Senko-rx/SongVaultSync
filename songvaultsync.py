@@ -44,6 +44,7 @@ def main() -> None:
         output_dir=args.output_dir,
         audio_format=args.format,
         bitrate=args.bitrate,
+        workers=args.workers,
     )
     result = orchestrator.json_to_mp3(str(list_file))
 

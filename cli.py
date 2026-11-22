@@ -9,6 +9,7 @@ from settings import AUDIO_BITRATE
 
 MIN_BITRATE_KBPS = 32
 MAX_BITRATE_KBPS = 320
+MAX_WORKERS = 8  # more parallel downloads mostly gets you throttled by YouTube
 
 
 def bitrate(value: str) -> str:
@@ -19,6 +20,17 @@ def bitrate(value: str) -> str:
             f"invalid bitrate '{value}': use e.g. 192k ({MIN_BITRATE_KBPS}k-{MAX_BITRATE_KBPS}k)"
         )
     return value
+
+
+def worker_count(value: str) -> int:
+    """argparse type: number of parallel downloads, 1..MAX_WORKERS."""
+    try:
+        count = int(value)
+    except ValueError:
+        count = 0
+    if not 1 <= count <= MAX_WORKERS:
+        raise argparse.ArgumentTypeError(f"invalid worker count '{value}': use 1-{MAX_WORKERS}")
+    return count
 
 
 def directory(value: str) -> Path:
@@ -85,5 +97,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=bitrate,
         default=AUDIO_BITRATE,
         help=f"Encoding bitrate, e.g. 192k (default: {AUDIO_BITRATE}). Ignored when opus is remuxed.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=worker_count,
+        default=1,
+        metavar="N",
+        help=f"Download N tracks in parallel (1-{MAX_WORKERS}, default: 1).",
     )
     return parser

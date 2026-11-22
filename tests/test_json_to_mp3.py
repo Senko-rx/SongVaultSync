@@ -127,3 +127,30 @@ def test_failed_tracks_are_returned_with_error(songs_file):
     [failed] = result.failed
     assert failed["id"] == "t1"
     assert failed["error"] == "nope"
+
+
+def _write_songs(path, count):
+    songs = [{"id": f"t{i}", "name": f"Song {i}", "artists": ["Artist"]} for i in range(count)]
+    Path(path).write_text(json.dumps(songs), encoding="utf-8")
+
+
+def test_workers_download_concurrently(songs_file):
+    import threading
+
+    _write_songs(songs_file, 2)
+    barrier = threading.Barrier(2, timeout=5)
+
+    class BarrierDownloader(FakeDownloader):
+        def download(self, *args, **kwargs):
+            barrier.wait()  # only passes if both downloads are in flight at once
+            return super().download(*args, **kwargs)
+
+    result = _run(songs_file, BarrierDownloader(), workers=2)
+    assert sorted(result.available) == ["t0", "t1"]
+
+
+def test_parallel_run_reports_same_results_as_sequential(songs_file):
+    _write_songs(songs_file, 6)
+    result = _run(songs_file, FakeDownloader(), workers=3)
+    assert sorted(result.available) == [f"t{i}" for i in range(6)]
+    assert result.failed == []

@@ -1,4 +1,6 @@
 import json
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,7 +28,9 @@ class JsonToMp3:
         output_dir: Path = Path("."),
         audio_format: str = "mp3",
         bitrate: str = AUDIO_BITRATE,
+        workers: int = 1,
     ):
+        self._workers = workers
         self._downloader = downloader
         self._embed_metadata = embed_metadata
         self._mp3_only = mp3_only  # i.e. keep only the converted file, whatever its format
@@ -76,23 +80,44 @@ class JsonToMp3:
         filenames = assign_filenames(songs)
         available: dict[str, Path] = {}
         failed: list[dict] = []
+        pending: dict[str, tuple[dict, Path]] = {}
 
-        for track in tqdm(songs, desc="Downloading", unit="track"):
-            key = track_key(track)
-            target = self._music_dir / f"{filenames[key]}.{self._format}"
-            if target.exists() or self._adopt_legacy_file(key, target):
-                available[key] = target
-                continue
-            try:
-                self._process(track, target)
-            except (DownloadError, ConversionError) as exc:
-                print(f"\n  {type(exc).__name__}: {exc}")
-                failed.append({**track, "error": str(exc)})
-                continue
-            available[key] = target
+        with tqdm(total=len(songs), desc="Downloading", unit="track") as progress:
+            # Cheap filesystem checks stay on this thread; only real work goes to the pool.
+            for track in songs:
+                key = track_key(track)
+                target = self._music_dir / f"{filenames[key]}.{self._format}"
+                if target.exists() or self._adopt_legacy_file(key, target):
+                    available[key] = target
+                    progress.update()
+                elif key not in pending:
+                    pending[key] = (track, target)
+
+            for key, error in self._run_pending(pending):
+                track, target = pending[key]
+                if error is None:
+                    available[key] = target
+                else:
+                    tqdm.write(f"  {type(error).__name__}: {error}")
+                    failed.append({**track, "error": str(error)})
+                progress.update()
 
         _report([track.get("name") or track_key(track) for track in failed])
         return SyncResult(available=available, failed=failed)
+
+    def _attempt(self, track: dict, target: Path) -> Exception | None:
+        try:
+            self._process(track, target)
+        except (DownloadError, ConversionError) as exc:
+            return exc
+        return None
+
+    def _run_pending(self, pending: dict[str, tuple[dict, Path]]) -> Iterator[tuple[str, Exception | None]]:
+        """Yield (track key, error or None) as tracks finish. Unexpected errors propagate."""
+        with ThreadPoolExecutor(max_workers=self._workers) as pool:
+            futures = {pool.submit(self._attempt, *job): key for key, job in pending.items()}
+            for future in as_completed(futures):
+                yield futures[future], future.result()
 
 
 def _report(failed: list[str]) -> None:

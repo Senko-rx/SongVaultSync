@@ -38,3 +38,11 @@ def test_rejects_unknown_format():
 def test_retry_failed_cannot_be_combined_with_other_sources():
     with pytest.raises(SystemExit):
         _parse("--retry-failed", "--all")
+
+
+def test_workers_default_and_range():
+    assert _parse().workers == 1
+    assert _parse("--workers", "4").workers == 4
+    for bad in ("0", "9", "x"):
+        with pytest.raises(SystemExit):
+            _parse("--workers", bad)
