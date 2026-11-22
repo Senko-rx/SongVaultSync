@@ -52,3 +52,9 @@ def test_fetch_tracks_follows_pagination_and_skips_null_tracks(sync):
         {"items": [ITEM], "next": None},
     ])
     assert len(sync.fetch_tracks(client, "playlist123")) == 2
+
+
+def test_fetch_tracks_skips_podcast_episodes(sync):
+    episode = {"track": {"type": "episode", "id": "e1", "name": "Episode", "duration_ms": 1}}
+    client = FakeClient([{"items": [episode, ITEM], "next": None}])
+    assert [t["id"] for t in sync.fetch_tracks(client, "playlist123")] == ["t1"]

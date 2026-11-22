@@ -58,3 +58,9 @@ def test_callback_address_parses_redirect_uri(uri, expected):
 def test_callback_address_rejects_unusable_uri(uri):
     with pytest.raises(SpotifyAuthError):
         callback_address(uri)
+
+
+@pytest.mark.parametrize("uri", ["http://0.0.0.0:8888/callback", "http://192.168.1.5:8888/callback"])
+def test_callback_address_must_be_loopback(uri):
+    with pytest.raises(SpotifyAuthError, match="127.0.0.1"):
+        callback_address(uri)

@@ -5,12 +5,17 @@ import requests
 from errors import SpotifyApiError
 from settings import BACKOFF_BASE, MAX_RETRIES
 
+API_BASE = "https://api.spotify.com/"
+
 
 class SpotifyClient:
     def __init__(self, access_token: str):
         self._headers = {"Authorization": f"Bearer {access_token}"}
 
     def get(self, url: str, params: dict | None = None) -> dict:
+        if not url.startswith(API_BASE):
+            # Pagination follows URLs from responses; never send the token anywhere else.
+            raise SpotifyApiError(f"Refusing to send credentials to non-Spotify URL '{url}' (expected {API_BASE})")
         last_error = None
         for attempt in range(MAX_RETRIES):
             try:

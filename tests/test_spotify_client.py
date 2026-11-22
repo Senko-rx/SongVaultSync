@@ -53,3 +53,9 @@ def test_raises_immediately_on_4xx():
     client = SpotifyClient("token")
     with pytest.raises(SpotifyApiError):
         client.get(URL)
+
+
+def test_refuses_to_send_token_outside_spotify_api():
+    client = SpotifyClient("token")
+    with pytest.raises(SpotifyApiError, match="api.spotify.com"):
+        client.get("https://evil.example/v1/me")

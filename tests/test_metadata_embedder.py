@@ -9,7 +9,7 @@ TRACK = {
     "name": "Test Song",
     "artists": ["Artist One", "Artist Two"],
     "album": "Test Album",
-    "album_cover_url": "https://example.com/cover.jpg",
+    "album_cover_url": "https://i.scdn.co/image/test",
 }
 
 
@@ -142,8 +142,53 @@ def test_embed_adds_cover_picture_to_opus(tmp_path):
     import metadata_embedder
 
     opus = _make_opus(tmp_path)
-    with patch("metadata_embedder.requests.get") as mock_get:
-        mock_get.return_value = MagicMock(content=b"jpegdata")
+    with patch("metadata_embedder.requests.get", return_value=_cover_response([b"\xff\xd8\xffjpeg"])):
         metadata_embedder.embed(opus, TRACK)
 
     assert "metadata_block_picture" in OggOpus(str(opus))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://i.scdn.co/image/abc",  # not https
+        "https://127.0.0.1:8080/admin",  # internal address
+        "https://evil.example/cover.jpg",  # not Spotify's CDN
+        "https://i.scdn.co.evil.example/x",  # suffix trick
+        "file:///etc/passwd",
+    ],
+)
+def test_cover_fetch_refuses_non_spotify_urls(url):
+    import metadata_embedder
+
+    with patch("metadata_embedder.requests.get") as mock_get:
+        assert metadata_embedder._fetch_cover({"name": "x", "album_cover_url": url}) is None
+    mock_get.assert_not_called()
+
+
+def _cover_response(chunks):
+    response = MagicMock()
+    response.iter_content.return_value = iter(chunks)
+    response.__enter__.return_value = response
+    return response
+
+
+def test_cover_fetch_accepts_spotify_jpeg_without_redirects():
+    import metadata_embedder
+
+    jpeg = b"\xff\xd8\xff" + b"0" * 10
+    with patch("metadata_embedder.requests.get", return_value=_cover_response([jpeg])) as mock_get:
+        cover = metadata_embedder._fetch_cover({"name": "x", "album_cover_url": "https://i.scdn.co/image/ab"})
+    assert cover == (jpeg, "image/jpeg")
+    assert mock_get.call_args.kwargs["allow_redirects"] is False
+
+
+def test_cover_fetch_rejects_oversized_or_non_image_bodies():
+    import metadata_embedder
+
+    url = {"name": "x", "album_cover_url": "https://i.scdn.co/image/ab"}
+    huge = [b"\xff\xd8\xff" + b"0" * (1024 * 1024)] * 6
+    with patch("metadata_embedder.requests.get", return_value=_cover_response(huge)):
+        assert metadata_embedder._fetch_cover(url) is None
+    with patch("metadata_embedder.requests.get", return_value=_cover_response([b"<html>"])):
+        assert metadata_embedder._fetch_cover(url) is None

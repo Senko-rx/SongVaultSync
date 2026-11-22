@@ -33,6 +33,15 @@ def worker_count(value: str) -> int:
     return count
 
 
+def source(value: str) -> str:
+    """argparse type: 'liked' or a Spotify playlist ID (base62), not a URL or path."""
+    if value == "liked" or re.fullmatch(r"[A-Za-z0-9]{1,64}", value):
+        return value
+    raise argparse.ArgumentTypeError(
+        f"invalid source '{value}': use 'liked' or a playlist ID (the part after /playlist/ in its link)"
+    )
+
+
 def directory(value: str) -> Path:
     return Path(value).expanduser()
 
@@ -56,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--source",
         action="append",
         dest="sources",
+        type=source,
         metavar="PLAYLIST_ID|liked",
         help="Source to download: 'liked' or a Spotify playlist ID. Repeatable.",
     )

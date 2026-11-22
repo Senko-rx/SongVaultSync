@@ -46,3 +46,16 @@ def test_workers_default_and_range():
     for bad in ("0", "9", "x"):
         with pytest.raises(SystemExit):
             _parse("--workers", bad)
+
+
+def test_source_accepts_liked_and_spotify_ids():
+    assert _parse("--source", "liked", "--source", "37i9dQZF1DXcBWIGoYBM5M").sources == [
+        "liked",
+        "37i9dQZF1DXcBWIGoYBM5M",
+    ]
+
+
+@pytest.mark.parametrize("bad", ["../me/tracks", "abc?x=1", "https://open.spotify.com/playlist/x"])
+def test_source_rejects_non_ids(bad):
+    with pytest.raises(SystemExit):
+        _parse("--source", bad)

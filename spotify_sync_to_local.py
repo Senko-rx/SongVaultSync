@@ -1,6 +1,7 @@
 import base64
 import os
 import secrets
+import time
 import urllib.parse
 import webbrowser
 from http.server import HTTPServer
@@ -19,6 +20,9 @@ REQUIRED_ENV_VARS = ("CLIENT_ID", "CLIENT_SECRET", "REDIRECT_URI")
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 TOKEN_TIMEOUT_SECONDS = 30
 DEFAULT_HTTP_PORT = 80
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost")  # IPv6 [::1] isn't supported by the IPv4 callback server
+LOGIN_TIMEOUT_SECONDS = 300
+CALLBACK_POLL_SECONDS = 1
 
 
 def load_credentials() -> tuple[str, str, str]:
@@ -39,6 +43,11 @@ def callback_address(redirect_uri: str) -> tuple[str, int]:
         raise SpotifyAuthError(
             f"REDIRECT_URI must be a plain http URL with a host, e.g. "
             f"http://127.0.0.1:8888/callback (got '{redirect_uri}')."
+        )
+    if parsed.hostname not in LOOPBACK_HOSTS:
+        raise SpotifyAuthError(
+            f"REDIRECT_URI must point at this machine (127.0.0.1 or localhost), got '{parsed.hostname}'. "
+            "Other addresses would expose the login callback to your network."
         )
     return parsed.hostname, parsed.port or DEFAULT_HTTP_PORT
 
@@ -80,12 +89,20 @@ class SpotifySyncToLocal:
         state = secrets.token_urlsafe(16)
         server = HTTPServer(self._callback_address, Handler)
         server.auth_code = None
+        server.auth_error = None
         server.expected_state = state
+        server.timeout = CALLBACK_POLL_SECONDS  # so the deadline is checked even with no requests
 
         webbrowser.open(self._build_auth_url(state))
 
-        while server.auth_code is None:
-            server.handle_request()
+        deadline = time.monotonic() + LOGIN_TIMEOUT_SECONDS
+        with server:
+            while server.auth_code is None:
+                if server.auth_error:
+                    raise SpotifyAuthError(f"Spotify login was not completed: {server.auth_error}")
+                if time.monotonic() > deadline:
+                    raise SpotifyAuthError(f"Timed out after {LOGIN_TIMEOUT_SECONDS}s waiting for the Spotify login.")
+                server.handle_request()
 
         return server.auth_code, state
 
@@ -145,8 +162,8 @@ class SpotifySyncToLocal:
             data = client.get(url)
             for item in data["items"]:
                 track = item.get("track")
-                if track is None:
-                    continue
+                if track is None or track.get("type") == "episode":
+                    continue  # removed tracks, and podcast episodes (no artists, can't be matched)
                 songs.append(_track_record(track))
             url = data.get("next")
 
