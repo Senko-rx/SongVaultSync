@@ -1,6 +1,7 @@
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from errors import ConversionError
 
 
@@ -45,3 +46,24 @@ def test_convert_raises_on_nonzero_exit(tmp_path):
         import converter
         with pytest.raises(ConversionError):
             converter.convert_to_mp3(src, dst)
+
+
+def test_import_does_not_exit_when_ffmpeg_missing():
+    import importlib
+
+    import converter
+    with patch("shutil.which", return_value=None):
+        importlib.reload(converter)  # must not raise SystemExit
+
+
+def test_ensure_ffmpeg_exits_when_missing():
+    import converter
+    with patch("converter.shutil.which", return_value=None):
+        with pytest.raises(SystemExit):
+            converter.ensure_ffmpeg()
+
+
+def test_ensure_ffmpeg_passes_when_present():
+    import converter
+    with patch("converter.shutil.which", return_value="/usr/bin/ffmpeg"):
+        converter.ensure_ffmpeg()

@@ -1,14 +1,16 @@
 import argparse
 import json
-from spotify_sync_to_local import SpotifySyncToLocal
-from spotify_client import SpotifyClient
-from playlist_selector import select_sources
+
+from converter import ensure_ffmpeg
 from downloaders import get_downloader
 from json_to_mp3 import JsonToMp3
+from playlist_selector import select_sources
+from spotify_client import SpotifyClient
+from spotify_sync_to_local import SpotifySyncToLocal
 
 
 def _flatten_catalog(catalog_file: str) -> list[dict]:
-    with open(catalog_file, "r", encoding="utf-8") as f:
+    with open(catalog_file, encoding="utf-8") as f:
         catalog = json.load(f)
 
     all_songs: list[dict] = []
@@ -65,9 +67,10 @@ def main() -> None:
     parser.add_argument(
         "--mp3-only",
         action="store_true",
-        help="Download and convert to mp3 in one step via yt-dlp, skipping the webm intermediate.",
+        help="Delete the downloaded source audio after converting, keeping only the mp3.",
     )
     args = parser.parse_args()
+    ensure_ffmpeg()
 
     if args.from_catalog:
         all_songs = _flatten_catalog(args.from_catalog)

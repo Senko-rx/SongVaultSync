@@ -2,17 +2,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from settings import AUDIO_BITRATE, SAMPLE_RATE
+
 from errors import ConversionError
+from settings import AUDIO_BITRATE, SAMPLE_RATE
 
 
-def _check_ffmpeg() -> None:
+def ensure_ffmpeg() -> None:
+    """Exit with a clear message if ffmpeg is not installed. Call from entry points."""
     if shutil.which("ffmpeg") is None:
         print("Error: ffmpeg not found on PATH. Please install ffmpeg and try again.")
         sys.exit(1)
-
-
-_check_ffmpeg()
 
 
 def convert_to_mp3(src: Path, dst: Path) -> None:
